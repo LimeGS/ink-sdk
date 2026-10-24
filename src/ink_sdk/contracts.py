@@ -81,6 +81,7 @@ class RunContext:
     normal: str = "auto"  # auto | inward | outward
     umbilicus: Path | None = None
     primary: str | None = None
+    orient_report: dict[str, Any] | None = None  # from `ink-sdk orient`; used only when primary is None
 
     def say(self, message: str) -> None:
         if self.progress is not None:

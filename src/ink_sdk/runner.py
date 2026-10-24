@@ -176,7 +176,8 @@ def infer(
     )
     raw = adapter_impl.run(prepared, profile, ctx)
     maps = adapter_impl.to_maps(raw, prepared, profile)
-    primary = ctx.primary or profile.output.primary
+    orientation_check = _orientation_check(ctx, profile)
+    primary = ctx.primary or orientation_check.get("applied_primary") or profile.output.primary
     if primary not in maps:
         raise ValidationError(
             f"primary {primary!r} is not among the produced maps {sorted(maps)}"
@@ -251,6 +252,8 @@ def infer(
                 for key, value in maps.items()
             },
             "primary": primary,
+            "primary_source": "user" if ctx.primary else ("orientation-check" if orientation_check.get("applied_primary") else "profile"),
+            "orientation_check": orientation_check or None,
             "liveness": liveness,
             "environment": _environment(ctx),
             "runtime_seconds": round(time.time() - started, 2),
@@ -285,6 +288,33 @@ def infer(
         receipt_path=receipt_path,
         receipt=receipt,
     )
+
+
+def _orientation_check(ctx: RunContext, profile) -> dict:
+    """Apply an `ink-sdk orient` report: only when the user did not pick a primary, only for the
+    adapter the report was made for, and only when the report recommends a map."""
+    report = ctx.orient_report
+    if not report:
+        return {}
+    summary = {
+        "schema": report.get("schema"),
+        "layer0_face": report.get("layer0_face"),
+        "recommended_primary": report.get("recommended_primary"),
+        "report_adapter": report.get("adapter"),
+        "sheet_side": report.get("sheet_side", {}).get("normal_points"),
+        "stack": report.get("stack", {}).get("layers_grow_along"),
+        "applied_primary": None,
+    }
+    rec = report.get("recommended_primary")
+    if ctx.primary:
+        summary["note"] = "user --primary wins over the report"
+    elif report.get("adapter") != profile.adapter:
+        summary["note"] = f"report was made for adapter {report.get('adapter')!r}, not {profile.adapter!r}; not applied"
+    elif rec is None:
+        summary["note"] = report.get("reason") or "no recommendation"
+    else:
+        summary["applied_primary"] = rec
+    return summary
 
 
 def render_segment(
