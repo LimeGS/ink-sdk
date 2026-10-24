@@ -61,6 +61,7 @@ def _ctx(
     umbilicus: Optional[Path],
     primary: Optional[str],
     no_render_cache: bool,
+    orient_report: Optional[dict] = None,
 ) -> RunContext:
     return RunContext(
         device=device,
@@ -82,6 +83,7 @@ def _ctx(
         normal=normal,
         umbilicus=umbilicus,
         primary=primary,
+        orient_report=orient_report,
         render_cache=Path(tempfile.mkdtemp(prefix="ink-sdk-no-render-cache-")) if no_render_cache else None,
     )
 
@@ -324,6 +326,9 @@ def infer(
     amp: Optional[str] = typer.Option(None, "--amp", help="Override bf16/fp16/default/fp32."),
     device: str = typer.Option("auto", "--device"),
     primary: Optional[str] = typer.Option(None, "--primary"),
+    orient_report: Optional[Path] = typer.Option(
+        None, "--orient", help="JSON from `ink-sdk orient`; picks the primary map when --primary is not given."
+    ),
     on_degenerate: str = typer.Option("fail", "--on-degenerate", help="fail | warn"),
     output_3d: bool = typer.Option(False, "--output-3d"),
     normal: str = typer.Option("auto", "--normal"),
@@ -351,6 +356,7 @@ def infer(
         on_degenerate=on_degenerate, resample_from_um=resample_from_um, output_3d=output_3d,
         amp=amp, roi=parsed_roi, normal=normal, umbilicus=umbilicus, primary=primary,
         no_render_cache=no_render_cache,
+        orient_report=json.loads(orient_report.read_text(encoding="utf-8")) if orient_report else None,
     )
     sdk = _build_sdk(renderer, models_dir, cache_dir, device, villa)
     segment = _build_segment(
@@ -369,6 +375,29 @@ def infer(
         typer.echo(f"{profile}: {result.primary} {liveness.get('verdict', 'unknown')}")
         typer.echo(f"out: {out}")
         typer.echo(f"p50={stats.get('p50')} p99={stats.get('p99')} max={stats.get('max')}")
+
+
+@app.command("orient")
+def orient_cmd(
+    tifxyz: Path = typer.Option(..., "--tifxyz", help="Mesh the surface volume was rendered from."),
+    surface_volume: Path = typer.Option(..., "--surface-volume"),
+    ct: str = typer.Option(..., "--ct", help="CT OME-Zarr (local path or URL) in the mesh's voxel frame."),
+    profile: Optional[str] = typer.Option(None, "--profile", "-p", help="Recommend a map for this profile's adapter."),
+    ct_level: str = typer.Option("0", "--ct-level", help="Pyramid level to read; pair with --mesh-divisor."),
+    mesh_divisor: float = typer.Option(1.0, "--mesh-divisor", help="Divide mesh coords, e.g. 4 for level 2."),
+    distance_vx: float = typer.Option(1000.0, "--distance-vx", help="Sagitta test distance in CT voxels."),
+    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Write the report JSON here."),
+) -> None:
+    """Label-free check of the depth direction of a surface volume (sheet side + CT match)."""
+    from .orient import orient
+
+    adapter = get_profile(profile).adapter if profile else None
+    report = _guard(lambda: orient(tifxyz, surface_volume, ct, adapter=adapter, ct_level=ct_level,
+                                   mesh_divisor=mesh_divisor, distance_vx=distance_vx))
+    text = json.dumps(jsonable(report), indent=2, sort_keys=True)
+    if out:
+        out.write_text(text + "\n", encoding="utf-8")
+    typer.echo(text)
 
 
 if __name__ == "__main__":
