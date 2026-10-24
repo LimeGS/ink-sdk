@@ -214,6 +214,9 @@ Implemented and tested synthetically:
 - native/pool/resample preparation and ROI cropping;
 - dummy end-to-end pipeline, receipts and liveness;
 - canonical/Hecate/9 µm adapters against fake models and a fake upstream;
+- the real Hecate 2.4 checkpoint loaded and ran a 2D CPU inference on a
+  synthetic 64×256×256 volume (near-zero output, as expected for random CT;
+  this is a smoke test, not a scientific result);
 - official renderer argv, orientation, cache, receipt and fallbacks;
 - CLI `models`, `doctor`, `inspect`, `render`, `infer`, `fetch`.
 
@@ -223,7 +226,7 @@ Not verified in this checkout:
 - the real Linux `vc_render_tifxyz` binary, which is not available on macOS;
 - a real `koine_machines` run, which needs a VILLA checkout, its `vesuvius`
   dependency, and a compatible runtime;
-- real canonical/Hecate weights and a GPU.
+- real canonical weights, Hecate 9.6 weights, and a GPU.
 
 The SDK is ready to run once those external artifacts are present. It deliberately
 fails closed when a checkpoint, renderer, scale, orientation, or dependency is
