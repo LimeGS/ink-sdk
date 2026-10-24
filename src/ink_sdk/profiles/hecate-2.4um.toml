@@ -1,0 +1,39 @@
+schema = "ink-sdk.profile.v1"
+id = "hecate@2.4um"
+adapter = "hecate"
+family = "surface-volume-3d2d"
+
+[source]
+repo = "scrollprize/hecate"
+revision = "9cb86e500e944b11a06a7020403cde5dffb5bcb2"
+upstream = "scrollprize/hecate"
+upstream_revision = "9cb86e500e944b11a06a7020403cde5dffb5bcb2"
+url = "https://huggingface.co/scrollprize/hecate"
+license = "MIT"
+
+[checkpoint]
+path = "hecate/hecate_2.4um.pth"
+sha256 = "fa2de3827ebd247ff2d33df1b6f899ea79d5269036cf16765997c62f0e9988c7"
+bytes = 522656918
+
+[input]
+kind = "surface-volume"
+family = "surface-volume-3d2d"
+scale_um = 2.4
+scale_tolerance_um = 0.048
+depth = 64
+normalization = "divide-200-no-clip"
+divisor = 200.0
+tile = 256
+stride = 128
+min_valid_ratio = 0.0
+
+[execution]
+direction = "forward"
+batch = 1
+amp = "fp32"
+
+[output]
+primary = "forward"
+no_ink_floor = 0.0
+floor_provenance = "not-declared"

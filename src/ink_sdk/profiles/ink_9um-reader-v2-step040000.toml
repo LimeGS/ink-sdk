@@ -1,0 +1,38 @@
+schema = "ink-sdk.profile.v1"
+id = "ink_9um@reader-v2-step040000"
+adapter = "ink9um"
+family = "surface-volume-2d"
+
+[source]
+repo = "domenicor046/reader-v2"
+revision = "72633d8aa6d40e9e737ccea4c9928fbc624dab45"
+upstream = "ScrollPrize/villa"
+upstream_revision = "3ea17f54a9b3d5fd1aaf73e1d2c8386dbaa9f30e"
+url = "https://huggingface.co/domenicor046/reader-v2"
+license = "MIT"
+
+[checkpoint]
+path = "reader-v2/reader-v2-step040000.pth"
+sha256 = "654ec5acec2b6c4788d9cb326e2f0b8c2c730584949a934ef775db7f6ab5d3a6"
+bytes = 138382373
+
+[input]
+kind = "surface-volume"
+family = "surface-volume-2d"
+scale_um = 9.6
+scale_tolerance_um = 0.5
+depth = 17
+normalization = "from-checkpoint"
+tile = 128
+overlap = 0.5
+
+[execution]
+direction = "both"
+blend = "hann"
+batch = 1
+amp = "bf16"
+
+[output]
+primary = "forward"
+no_ink_floor = 0.0
+floor_provenance = "not-declared"

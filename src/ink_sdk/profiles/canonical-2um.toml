@@ -1,0 +1,39 @@
+schema = "ink-sdk.profile.v1"
+id = "canonical_2um@r152-3ddec-v2-l5-epoch13"
+adapter = "canonical2um"
+family = "surface-volume-2d"
+
+[source]
+repo = "scrollprize/ink_canonical_2um"
+revision = "075855bc69317ef6febf39a0d9d687b27d2b7c29"
+upstream = "ScrollPrize/villa"
+upstream_revision = "3ea17f54a9b3d5fd1aaf73e1d2c8386dbaa9f30e"
+url = "https://huggingface.co/scrollprize/ink_canonical_2um"
+license = "MIT"
+
+[checkpoint]
+path = "canonical/r152_3ddec_v2_l5_epoch13.ckpt"
+sha256 = "36dd0de84b7b7aa6590184192c7415466cd8a1ba7c1e59f42c6373846373c3e0"
+bytes = 1549556213
+
+[input]
+kind = "surface-volume"
+family = "surface-volume-2d"
+scale_um = 2.399
+scale_tolerance_um = 0.05
+depth = 62
+normalization = "divide-255-no-clip"
+divisor = 255.0
+tile = 256
+stride = 128
+min_valid_ratio = 0.6
+
+[execution]
+direction = "forward"
+batch = 4
+amp = "default"
+
+[output]
+primary = "forward"
+no_ink_floor = 0.0
+floor_provenance = "not-declared"

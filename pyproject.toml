@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ink-sdk"
+version = "0.1.0"
+description = "Standalone inference SDK for Vesuvius ink detection"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "LimeGS"}]
+dependencies = [
+  "numpy>=1.26",
+  "pydantic>=2",
+  "typer>=0.12",
+  "zarr>=2.18",
+  "tifffile>=2024.1",
+]
+
+[project.optional-dependencies]
+render = ["scipy>=1.11"]
+canonical = ["torch>=2.2"]
+hecate = ["torch>=2.2", "scipy>=1.11"]
+ink9um = ["torch>=2.2"]
+fetch = ["huggingface_hub>=0.23"]
+all = ["scipy>=1.11", "torch>=2.2", "huggingface_hub>=0.23"]
+test = ["pytest>=8", "pytest-cov"]
+
+[project.scripts]
+ink-sdk = "ink_sdk.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ink_sdk = ["profiles/*.toml", "_vendor/**/*.py", "_vendor/**/*.txt", "_vendor/**/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "render: needs the external vc_render_tifxyz binary",
+  "models: needs model weights and, for the real golden test, a GPU",
+]
