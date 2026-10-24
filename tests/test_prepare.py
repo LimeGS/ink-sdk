@@ -61,3 +61,23 @@ def test_resample_xy_changes_only_xy():
     assert out.shape[0] == 2
     assert out.shape[1] == 5
     assert out.shape[2] == 5
+
+
+def test_transformed_input_without_cache_gets_a_materialised_zarr(tmp_path):
+    import zarr
+
+    path = tmp_path / "vol.zarr"
+    group = zarr.open_group(str(path), mode="w", zarr_format=2)
+    group.create_array("0", shape=(4, 8, 8), dtype="u1", chunks=(2, 4, 4))
+    group["0"][:] = 3
+    group.attrs["pixel_um"] = [2.4, 2.4, 2.4]
+    prepared = prepare_input(
+        path,
+        get_profile("canonical_2um@r152-3ddec-v2-l5-epoch13"),
+        source_um=2.4,
+        cache_dir=None,
+        roi=(1, 3, 2, 6),
+    )
+    assert prepared.array.shape == (4, 2, 4)
+    assert prepared.path != path
+    assert (prepared.path / "0" / ".zarray").is_file()

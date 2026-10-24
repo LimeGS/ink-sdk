@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from ink_sdk.errors import ValidationError
-from ink_sdk.profiles import ModelProfile, load_profile
+from ink_sdk.errors import ModelIntegrityError, ValidationError
+from ink_sdk.profiles import load_profile
 from ink_sdk.registry import get_profile, list_profiles
 
 
@@ -58,5 +58,5 @@ def test_checkpoint_digest_validation(tmp_path, monkeypatch):
     path = tmp_path / profile.checkpoint.path
     path.parent.mkdir(parents=True)
     path.write_bytes(b"not the pinned checkpoint")
-    with pytest.raises(Exception):
+    with pytest.raises(ModelIntegrityError):
         profile.verify_checkpoint(tmp_path)

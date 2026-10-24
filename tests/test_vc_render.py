@@ -1,14 +1,10 @@
 from __future__ import annotations
 
 import json
-import os
 import stat
 from pathlib import Path
 
-import numpy as np
-import pytest
-
-from ink_sdk.contracts import RunContext, Segment
+from ink_sdk.contracts import RenderSpec, RunContext, Segment
 from ink_sdk.registry import get_profile
 from ink_sdk.renderers.vc_render_tifxyz import VcRenderTifxyzRenderer
 from ink_sdk.resolver import build_segment
@@ -85,12 +81,26 @@ def test_render_command_and_cache(tmp_path, mesh, ct, monkeypatch):
     assert len(log.read_text().splitlines()) == 1
 
 
+def test_single_direction_profile_requires_orientation(tmp_path, mesh, ct):
+    profile = get_profile("canonical_2um@r152-3ddec-v2-l5-epoch13")
+    segment = Segment(
+        id="s",
+        root=mesh,
+        surface_mesh=mesh,
+        ct=ct,
+        pixel_um=(2.4, 2.4, 2.4),
+        render=RenderSpec(num_slices=62, orientation="auto"),
+    )
+    issues = VcRenderTifxyzRenderer().check(segment, profile)
+    orientation = [i for i in issues if i.code == "unverified-orientation"]
+    assert orientation and orientation[0].is_error
+
+
 def test_missing_renderer_is_an_issue(tmp_path, mesh, ct, monkeypatch):
     monkeypatch.delenv("INK_SDK_RENDERER", raising=False)
     monkeypatch.delenv("VC3D_APPRUN", raising=False)
     monkeypatch.setenv("PATH", str(tmp_path))
     profile = get_profile("canonical_2um@r152-3ddec-v2-l5-epoch13")
-    ctx = RunContext()
     segment = Segment(id="s", root=mesh, surface_mesh=mesh, ct=ct, pixel_um=(2.4, 2.4, 2.4))
     issues = VcRenderTifxyzRenderer().check(segment, profile)
     assert any(i.code == "missing-renderer" for i in issues)
