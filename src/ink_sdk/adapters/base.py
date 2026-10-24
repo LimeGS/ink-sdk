@@ -67,6 +67,7 @@ class BaseAdapter:
             source_um=scale,
             cache_dir=ctx.cache_dir,
             resample_from_um=ctx.resample_from_um,
+            roi=ctx.roi,
         )
 
     def run(
