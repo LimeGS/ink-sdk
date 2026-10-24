@@ -357,6 +357,8 @@ class VcRenderTifxyzRenderer:
             receipt["cache_hit"] = True
             receipt["roi"] = list(spec.roi) if spec.roi else None
             receipt["roi_application"] = "post-render-in-prepare" if spec.roi else None
+            receipt["render_crop"] = None
+            receipt["render_crop_application"] = "not-implemented-post-render-roi"
             array = _read_render(cache_dir)
             return RenderedVolume(
                 path=cache_dir,
@@ -473,6 +475,8 @@ class VcRenderTifxyzRenderer:
                 "flip_normals_python": python_flip,
                 "roi": list(spec.roi) if spec.roi else None,
                 "roi_application": "post-render-in-prepare" if spec.roi else None,
+                "render_crop": None,
+                "render_crop_application": "not-implemented-post-render-roi",
                 "shape_zyx": [int(v) for v in array.shape],
                 "pixel_um": out_px,
                 "layer_step_um": float(pixel_um[0] * spec.slice_step),

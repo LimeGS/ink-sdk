@@ -12,7 +12,7 @@ from ink_sdk.errors import DegenerateMapError, ValidationError
 from ink_sdk.registry import get_profile
 from ink_sdk.renderers.base import DummyRenderer
 from ink_sdk.resolver import build_segment
-from ink_sdk.runner import infer
+from ink_sdk.runner import _prepare_out, infer
 
 
 def _segment(tmp_path: Path, mesh: Path, ct: Path, profile):
@@ -91,3 +91,12 @@ def test_existing_output_needs_overwrite(tmp_path, mesh, ct):
     strict = RunContext(**{**ctx.__dict__, "overwrite": False})
     with pytest.raises(ValidationError):
         infer(segment, profile, strict, out_dir=tmp_path / "out", adapter=DummyAdapter(), renderer=DummyRenderer())
+
+
+def test_overwrite_refuses_the_current_working_directory(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    keep = tmp_path / "keep.txt"
+    keep.write_text("do not delete")
+    with pytest.raises(ValidationError):
+        _prepare_out(tmp_path, overwrite=True)
+    assert keep.read_text() == "do not delete"

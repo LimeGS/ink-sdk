@@ -51,6 +51,14 @@ def _prepare_out(out_dir: Path, overwrite: bool) -> Path:
         raise ValidationError(
             f"output directory is not empty: {out_dir}. Pass --overwrite to replace files."
         )
+    resolved = out_dir.resolve()
+    protected = (
+        resolved == Path.cwd().resolve()
+        or resolved == Path.home().resolve()
+        or resolved.parent == resolved
+    )
+    if populated and protected:
+        raise ValidationError(f"refusing to delete a protected output directory: {out_dir}")
     if populated:
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -207,7 +215,7 @@ def infer(
                 "path": str(profile.checkpoint_path(_models_dir(ctx))),
                 "sha256": profile.checkpoint.sha256,
                 "bytes": profile.checkpoint.bytes,
-                "verified": True,
+                "verified": getattr(adapter_impl, "name", None) == profile.adapter,
             },
             "segment": {
                 "id": current.id,
@@ -417,7 +425,7 @@ def doctor(
             try:
                 profile.verify_checkpoint(models)
                 verified = True
-            except InkSDKError as exc:
+            except (InkSDKError, OSError) as exc:
                 error = str(exc)
         profile_status.append(
             {

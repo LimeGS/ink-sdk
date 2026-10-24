@@ -50,14 +50,20 @@ def fetch_profile(
                 f"downloading {profile.source.repo}/{profile.upstream_checkpoint_path} "
                 f"@{profile.source.revision}"
             )
-        downloaded = Path(
-            hf_hub_download(
-                repo_id=profile.source.repo,
-                filename=profile.upstream_checkpoint_path,
-                revision=profile.source.revision,
-                local_dir=tmp,
+        try:
+            downloaded = Path(
+                hf_hub_download(
+                    repo_id=profile.source.repo,
+                    filename=profile.upstream_checkpoint_path,
+                    revision=profile.source.revision,
+                    local_dir=tmp,
+                )
             )
-        )
+        except Exception as exc:
+            raise ModelIntegrityError(
+                f"download failed for {profile.source.repo}/"
+                f"{profile.upstream_checkpoint_path}: {exc}"
+            ) from exc
         if downloaded.stat().st_size != profile.checkpoint.bytes:
             raise ModelIntegrityError(
                 f"downloaded size {downloaded.stat().st_size} != pinned "
@@ -69,7 +75,10 @@ def fetch_profile(
                 f"downloaded digest {digest} != pinned {profile.checkpoint.sha256}: "
                 f"{profile.source.repo}"
             )
-        shutil.move(str(downloaded), destination)
+        try:
+            shutil.move(str(downloaded), destination)
+        except OSError as exc:
+            raise ModelIntegrityError(f"could not place checkpoint at {destination}: {exc}") from exc
     if progress:
         progress(f"placed {destination}")
     return destination
