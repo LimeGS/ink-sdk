@@ -8,8 +8,9 @@ Hecate can also write a 3D zarr.
 
 ![ink-sdk on PHerc1447 w058](docs/img/sdk_w058.png)
 
-*One real run (PHerc1447 w058, public data). The same 9 µm model sees ink in one depth order and is blind
-in the other; both maps pass the liveness gate, so the depth direction matters.*
+*One real run on public data (PHerc1447 w058; the human ink label is shown for reference only). The same
+9 µm model sees ink in one depth order and is blind in the other, and both maps pass the liveness gate, so
+the depth direction matters.*
 
 ## Quick start
 
