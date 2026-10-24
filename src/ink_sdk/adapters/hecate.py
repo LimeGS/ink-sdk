@@ -88,7 +88,9 @@ class HecateAdapter(BaseAdapter):
             if device_name != "cuda":
                 raise InkSDKError("Hecate bf16 requires CUDA; use --device cpu with fp32")
         else:
-            raise ValidationError(f"unsupported Hecate precision {profile.execution.amp!r}")
+            raise ValidationError(
+                f"unsupported Hecate precision {ctx.amp or profile.execution.amp!r}"
+            )
 
         started = time.time()
         direction = profile.execution.direction

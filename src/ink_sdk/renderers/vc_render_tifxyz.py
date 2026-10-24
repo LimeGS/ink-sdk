@@ -367,19 +367,6 @@ class VcRenderTifxyzRenderer:
                 cache_hit=True,
             )
 
-        # Estimate the auto-cropped canvas from the mesh, not the whole CT: a
-        # small scroll patch on a huge CT must not trip the memory guard.
-        bbox_y = int(np.ceil((float(points[:, 1].max()) - float(points[:, 1].min())) / float(spec.scale))) + 3
-        bbox_x = int(np.ceil((float(points[:, 0].max()) - float(points[:, 0].min())) / float(spec.scale))) + 3
-        estimated = int(num_slices) * max(bbox_y, 1) * max(bbox_x, 1)
-        limit = int(float(ctx.max_render_gb) * (1024**3))
-        if estimated > limit:
-            raise RenderError(
-                f"render would allocate about {estimated / 1024**3:.2f} GiB "
-                f"(limit {ctx.max_render_gb:g} GiB); pass a larger --max-render-gb "
-                "or a smaller mesh"
-            )
-
         if not _supports(binary, "--scale"):
             raise RenderError(
                 f"{binary} does not advertise --scale; the pinned renderer must "
@@ -388,6 +375,35 @@ class VcRenderTifxyzRenderer:
         supports_auto_crop = _supports(binary, "--auto-crop")
         supports_flip = _supports(binary, "--flip-normals")
         supports_slice_step = _supports(binary, "--slice-step")
+
+        # Estimate the canvas from the mesh when auto-crop is available. If it
+        # is not, the renderer writes the full CT canvas, so use that instead.
+        if supports_auto_crop:
+            bbox_y = int(np.ceil((float(points[:, 1].max()) - float(points[:, 1].min())) / float(spec.scale))) + 3
+            bbox_x = int(np.ceil((float(points[:, 0].max()) - float(points[:, 0].min())) / float(spec.scale))) + 3
+        else:
+            bbox_y = int(np.ceil(float(shape_xyz[1]) / float(spec.scale)))
+            bbox_x = int(np.ceil(float(shape_xyz[2]) / float(spec.scale)))
+        estimated = int(num_slices) * max(bbox_y, 1) * max(bbox_x, 1)
+        limit = int(float(ctx.max_render_gb) * (1024**3))
+        if estimated > limit:
+            raise RenderError(
+                f"render would allocate about {estimated / 1024**3:.2f} GiB "
+                f"(limit {ctx.max_render_gb:g} GiB); pass a larger --max-render-gb "
+                "or a smaller mesh"
+            )
+        cache_dir.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            free = shutil.disk_usage(cache_dir.parent).free
+        except OSError:
+            free = None
+        # The stage zarr and the published zarr coexist briefly during publish.
+        if free is not None and estimated * 2 > free:
+            raise RenderError(
+                f"render needs about {estimated * 2 / 1024**3:.2f} GiB free for the "
+                f"stage and published zarr, but {cache_dir.parent} has "
+                f"{free / 1024**3:.2f} GiB"
+            )
         python_flip = bool(orientation["flip_normals"]) and not supports_flip
         cmd = [
             *prefix,
@@ -406,7 +422,6 @@ class VcRenderTifxyzRenderer:
         if orientation["flip_normals"] and supports_flip:
             cmd.append("--flip-normals")
 
-        cache_dir.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix=f".{key}.render-", dir=cache_dir.parent) as tmp:
             stage = Path(tmp) / "render.zarr"
             actual = [str(stage) if part == "{stage}" else part for part in cmd]

@@ -124,7 +124,11 @@ The SDK refuses stretches that the profiles do not support:
 `prepare` pools or resamples first, then applies ROI in output-map pixels.
 The render itself is not cropped to the ROI; the full render stays cached and
 the receipt says `roi_application = "post-render-in-prepare"`. This trades peak
-disk/RAM for exact output shape and avoids a second geometry mapping.
+disk/RAM for exact output shape and avoids a second geometry mapping. The v2
+design's pre-render mesh crop (32 px margin) is therefore not implemented in
+this version; it is the main deliberate deviation for ROI. If a binary does not
+support `--auto-crop`, the full CT-sized canvas is rendered and no post-render
+bbox trim is applied.
 
 ## Orientation
 

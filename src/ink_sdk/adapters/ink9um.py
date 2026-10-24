@@ -112,6 +112,9 @@ class Ink9umAdapter(BaseAdapter):
             reverse_output.unlink()
 
         interpreter = ctx.python or sys.executable
+        amp = str(ctx.amp or profile.execution.amp)
+        # Upstream names the fp32 path "default"; it has no "fp32" choice.
+        upstream_amp = "default" if amp == "fp32" else amp
         command = [
             interpreter,
             "-m",
@@ -128,7 +131,7 @@ class Ink9umAdapter(BaseAdapter):
             "--batch-size",
             str(profile.execution.batch),
             "--amp-dtype",
-            str(ctx.amp or profile.execution.amp),
+            upstream_amp,
             "--no-compile",
         ]
         env = dict(os.environ)
@@ -185,7 +188,9 @@ class Ink9umAdapter(BaseAdapter):
             pass
         return RawOutput(
             maps=maps,
-            valid=None,
+            # The 9 um lane has a legitimate 0.25 no-ink floor; do not exclude
+            # zeros from liveness as if they were missing coverage.
+            valid=np.ones_like(next(iter(maps.values())), dtype=bool),
             quantisation={
                 "source_dtype": "uint8",
                 "levels": 255,
@@ -203,7 +208,8 @@ class Ink9umAdapter(BaseAdapter):
                 "direction": profile.execution.direction,
                 "blend": profile.execution.blend,
                 "batch": profile.execution.batch,
-                "amp": ctx.amp or profile.execution.amp,
+                "amp": upstream_amp,
+                "amp_requested": amp,
                 "runtime_seconds": round(time.time() - started, 2),
                 "statistics": {key: stats(value) for key, value in maps.items()},
                 "non_claims": [

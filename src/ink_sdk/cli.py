@@ -199,7 +199,12 @@ def doctor(
         mark = "ok" if check["ok"] else ("missing" if check["required"] else "optional")
         typer.echo(f"[{mark}] {check['name']}: {check['detail']}")
     for profile in result["profiles"]:
-        state = "present" if profile["present"] and profile["size_matches"] else "missing/size-mismatch"
+        if profile.get("digest_matches"):
+            state = "verified"
+        elif profile["present"]:
+            state = "present-but-unverified"
+        else:
+            state = "missing"
         typer.echo(f"[{state}] {profile['id']}: {profile['path']}")
 
 

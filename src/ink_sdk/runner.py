@@ -19,7 +19,7 @@ import tifffile
 
 from . import __version__
 from .contracts import InkResult, InkVolume, RunContext, Segment
-from .errors import DegenerateMapError, ValidationError
+from .errors import DegenerateMapError, InkSDKError, ValidationError
 from .io import write_json, write_zarr
 from .liveness import assess_liveness, forward_reverse_asymmetry
 from .prepare import prepare_input
@@ -409,14 +409,25 @@ def doctor(
     profile_status = []
     for profile in list_profiles():
         path = profile.checkpoint_path(models)
-        size = path.stat().st_size if path.is_file() else None
+        present = path.is_file()
+        size = path.stat().st_size if present else None
+        verified = False
+        error = None
+        if present:
+            try:
+                profile.verify_checkpoint(models)
+                verified = True
+            except InkSDKError as exc:
+                error = str(exc)
         profile_status.append(
             {
                 "id": profile.id,
                 "path": str(path),
                 "upstream_path": profile.upstream_checkpoint_path,
-                "present": path.is_file(),
+                "present": present,
                 "size_matches": size == profile.checkpoint.bytes if size is not None else False,
+                "digest_matches": verified,
+                "error": error,
             }
         )
     return {

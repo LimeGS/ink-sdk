@@ -4,10 +4,13 @@ import json
 import stat
 from pathlib import Path
 
+import pytest
+
 from ink_sdk.contracts import RenderSpec, RunContext, Segment
+from ink_sdk.errors import RenderError
 from ink_sdk.registry import get_profile
 from ink_sdk.renderers.vc_render_tifxyz import VcRenderTifxyzRenderer
-from ink_sdk.resolver import build_segment
+from ink_sdk.resolver import build_segment, with_render_spec
 
 FAKE = r'''#!/usr/bin/env python3
 import argparse, json, os, sys
@@ -60,9 +63,7 @@ def test_render_command_and_cache(tmp_path, mesh, ct, monkeypatch):
     )
     segment = build_segment(profile=profile, ctx=ctx, tifxyz=mesh, ct=ct, force_render=True)
     renderer = VcRenderTifxyzRenderer()
-    current = __import__("ink_sdk.resolver", fromlist=["with_render_spec"]).with_render_spec(
-        segment, profile, ctx
-    )
+    current = with_render_spec(segment, profile, ctx)
     assert current.render is not None
     assert current.render.num_slices == 68
     rendered = renderer.render(current, current.render, profile, ctx)
@@ -94,6 +95,25 @@ def test_single_direction_profile_requires_orientation(tmp_path, mesh, ct):
     issues = VcRenderTifxyzRenderer().check(segment, profile)
     orientation = [i for i in issues if i.code == "unverified-orientation"]
     assert orientation and orientation[0].is_error
+
+
+def test_render_memory_guard_stops_before_the_binary(tmp_path, mesh, ct):
+    binary = _fake_renderer(tmp_path)
+    ctx = RunContext(
+        renderer=binary,
+        cache_dir=tmp_path / "cache",
+        render_cache=tmp_path / "render-cache",
+        max_render_gb=1e-9,
+    )
+    profile = get_profile("ink_9um@scrollprize-seed43-step75000")
+    segment = with_render_spec(
+        build_segment(profile=profile, ctx=ctx, tifxyz=mesh, ct=ct, force_render=True),
+        profile,
+        ctx,
+    )
+    assert segment.render is not None
+    with pytest.raises(RenderError, match="max-render-gb"):
+        VcRenderTifxyzRenderer().render(segment, segment.render, profile, ctx)
 
 
 def test_missing_renderer_is_an_issue(tmp_path, mesh, ct, monkeypatch):
