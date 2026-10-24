@@ -15,7 +15,7 @@ from typing import Callable
 import numpy as np
 
 from ..contracts import Issue, PreparedInput, RawOutput, RunContext, Segment
-from ..errors import InkSDKError, MissingDependencyError, ValidationError
+from ..errors import InkSDKError, ValidationError
 from ..profiles import ModelProfile
 from .base import BaseAdapter, source_scale_issue, stats
 
@@ -155,7 +155,9 @@ class Canonical2umAdapter(BaseAdapter):
                     total[y : y + tile, x : x + tile] += value * weight
                     norm[y : y + tile, x : x + tile] += weight
 
-        probability = torch.where(norm > 0, total / norm.clamp(min=1e-6), torch.zeros_like(total))
+        # The Hann window is ~2e-8 at the border; a 1e-6 clamp would darken
+        # every edge. Clamp only to keep the division finite where norm is 0.
+        probability = torch.where(norm > 0, total / norm.clamp(min=1e-20), torch.zeros_like(total))
         result = np.where(valid_np, probability.detach().cpu().numpy(), 0.0).astype(np.float32)
         result = result[:height, :width]
         valid_out = valid_np[:height, :width]

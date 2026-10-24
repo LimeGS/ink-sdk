@@ -55,6 +55,7 @@ def _ctx(
     on_degenerate: str,
     resample_from_um: Optional[float],
     output_3d: bool,
+    amp: Optional[str],
     roi: tuple[int, int, int, int] | None,
     normal: str,
     umbilicus: Optional[Path],
@@ -76,6 +77,7 @@ def _ctx(
         on_degenerate=on_degenerate,
         resample_from_um=resample_from_um,
         output_3d=output_3d,
+        amp=amp,
         roi=roi,
         normal=normal,
         umbilicus=umbilicus,
@@ -159,6 +161,28 @@ def models(json_output: bool = typer.Option(False, "--json", help="Emit JSON."))
             )
 
 
+@app.command("fetch")
+def fetch(
+    profile: Optional[list[str]] = typer.Option(None, "--profile", "-p", help="Repeatable; default all."),
+    models_dir: Optional[Path] = typer.Option(None, "--models-dir"),
+    overwrite: bool = typer.Option(False, "--overwrite"),
+) -> None:
+    """Download pinned checkpoints from Hugging Face, then verify size and sha256."""
+    from .fetch import fetch_profiles
+
+    target = models_dir or Path(
+        os.environ.get("INK_SDK_MODELS", Path.home() / ".cache" / "ink-sdk" / "models")
+    )
+    selected = [get_profile(item) for item in profile] if profile else list_profiles()
+    paths = _guard(
+        lambda: fetch_profiles(
+            selected, models_dir=target, overwrite=overwrite, progress=typer.echo
+        )
+    )
+    for path in paths:
+        typer.echo(path)
+
+
 @app.command("doctor")
 def doctor(
     json_output: bool = typer.Option(False, "--json"),
@@ -218,7 +242,8 @@ def inspect(
         device="auto", cache_dir=None, models_dir=models_dir, renderer=renderer, villa=villa,
         python=None, overwrite=False, dry_run=True, deterministic=False, render_threads=1,
         max_render_gb=64.0, on_degenerate="warn", resample_from_um=None, output_3d=False,
-        roi=parsed_roi, normal=normal, umbilicus=umbilicus, primary=None, no_render_cache=False,
+        amp=None, roi=parsed_roi, normal=normal, umbilicus=umbilicus, primary=None,
+        no_render_cache=False,
     )
     sdk = _build_sdk(renderer, models_dir, None, "auto", villa)
     segment = _build_segment(
@@ -253,7 +278,7 @@ def render(
         device="cpu", cache_dir=Path.home() / ".cache" / "ink-sdk", models_dir=None,
         renderer=renderer, villa=None, python=None, overwrite=overwrite, dry_run=dry_run,
         deterministic=False, render_threads=threads, max_render_gb=max_render_gb,
-        on_degenerate="warn", resample_from_um=None, output_3d=False, roi=None,
+        on_degenerate="warn", resample_from_um=None, output_3d=False, amp=None, roi=None,
         normal=normal, umbilicus=umbilicus, primary=None, no_render_cache=False,
     )
     sdk = _build_sdk(renderer, None, ctx.cache_dir, "cpu", None)
@@ -291,6 +316,7 @@ def infer(
     force_render: bool = typer.Option(False, "--render"),
     roi: Optional[str] = typer.Option(None, "--roi", help="y0,y1,x0,x1 half-open at output scale."),
     resample_from_um: Optional[float] = typer.Option(None, "--resample-from-um"),
+    amp: Optional[str] = typer.Option(None, "--amp", help="Override bf16/fp16/default/fp32."),
     device: str = typer.Option("auto", "--device"),
     primary: Optional[str] = typer.Option(None, "--primary"),
     on_degenerate: str = typer.Option("fail", "--on-degenerate", help="fail | warn"),
@@ -318,7 +344,7 @@ def infer(
         villa=villa, python=python, overwrite=overwrite, dry_run=dry_run,
         deterministic=deterministic, render_threads=threads, max_render_gb=max_render_gb,
         on_degenerate=on_degenerate, resample_from_um=resample_from_um, output_3d=output_3d,
-        roi=parsed_roi, normal=normal, umbilicus=umbilicus, primary=primary,
+        amp=amp, roi=parsed_roi, normal=normal, umbilicus=umbilicus, primary=primary,
         no_render_cache=no_render_cache,
     )
     sdk = _build_sdk(renderer, models_dir, cache_dir, device, villa)

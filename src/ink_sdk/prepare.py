@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -54,7 +55,6 @@ def plan_scale(
     if adapter == "ink9um" and resample_from_um is not None:
         if abs(source - float(resample_from_um)) <= 0.2:
             if abs(RESAMPLE_OUTPUT_UM - target) <= tolerance:
-                zoom = source / RESAMPLE_OUTPUT_UM
                 return ScalePlan(
                     source,
                     RESAMPLE_OUTPUT_UM,
@@ -186,7 +186,12 @@ def prepare_input(
         )
 
     key = _cache_key(source, profile, plan, roi)
-    prepared_dir = cache_dir / "prepared" / key if cache_dir is not None else None
+    if cache_dir is not None:
+        prepared_dir = cache_dir / "prepared" / key
+    else:
+        # The 9 um adapter runs on a path, not on the in-memory array. A
+        # transformed input therefore needs a real zarr even without a cache.
+        prepared_dir = Path(tempfile.mkdtemp(prefix="ink-sdk-prepared-")) / "volume.zarr"
     if prepared_dir is not None and (prepared_dir / "0" / ".zarray").is_file():
         volume = open_volume_array(prepared_dir)
         validate_uint8_zyx(volume)

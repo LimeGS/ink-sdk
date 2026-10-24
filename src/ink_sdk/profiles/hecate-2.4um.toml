@@ -13,6 +13,7 @@ license = "MIT"
 
 [checkpoint]
 path = "hecate/hecate_2.4um.pth"
+upstream_path = "hecate_2.4um.pth"
 sha256 = "fa2de3827ebd247ff2d33df1b6f899ea79d5269036cf16765997c62f0e9988c7"
 bytes = 522656918
 

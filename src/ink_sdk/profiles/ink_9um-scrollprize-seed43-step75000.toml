@@ -13,6 +13,7 @@ license = "MIT"
 
 [checkpoint]
 path = "ink_9um/hybrid_3d2d-seed43/step-075000.pth"
+upstream_path = "hybrid_3d2d-seed43/step-075000.pth"
 sha256 = "2aeaa85a35ef28d7bc7bf3e848c4a6a91385e9132710927fdba41133c4ecb28f"
 bytes = 138360231
 

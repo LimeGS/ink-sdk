@@ -23,15 +23,11 @@ import zarr
 
 from ..contracts import Issue, RenderedVolume, RenderSpec, RunContext, Segment
 from ..errors import MissingDependencyError, RenderError, ValidationError
-from ..io import (
-    ct_preflight,
-    pixel_um_from_zarr,
-    sha256_file,
-    write_json,
-    write_zarr,
-)
+from ..io import ct_preflight, sha256_file, write_json, write_zarr
 from ..profiles import ModelProfile
-from .base import Renderer, render_key
+from .base import render_key
+
+_HELP_CACHE: dict[tuple[str, int, int], tuple[bool, str]] = {}
 
 
 def _utc() -> str:
@@ -43,6 +39,31 @@ def _binary_parts(path: Path) -> tuple[list[str], Path]:
     if path.name == "AppRun":
         return [str(path), "vc_render_tifxyz"], path
     return [str(path)], path
+
+
+def _help(binary: Path) -> tuple[bool, str]:
+    stat = binary.stat()
+    key = (str(binary), stat.st_size, stat.st_mtime_ns)
+    if key in _HELP_CACHE:
+        return _HELP_CACHE[key]
+    prefix, _ = _binary_parts(binary)
+    try:
+        completed = subprocess.run(
+            [*prefix, "--help"], capture_output=True, text=True, timeout=30
+        )
+        text = (completed.stdout or "") + (completed.stderr or "")
+        result = (completed.returncode == 0, text)
+    except (OSError, subprocess.SubprocessError) as exc:
+        result = (False, str(exc))
+    _HELP_CACHE[key] = result
+    return result
+
+
+def _supports(binary: Path, flag: str) -> bool:
+    ok, text = _help(binary)
+    # A renderer that refuses --help is treated as an older binary whose flags
+    # we cannot inspect; the render itself will produce the actionable error.
+    return (not ok) or flag in text
 
 
 def _resolve_binary(spec: RenderSpec, ctx: RunContext) -> Path:
@@ -167,8 +188,11 @@ def _orientation(mesh: Path, spec: RenderSpec) -> dict[str, Any]:
     else:
         transpose, rows, cols = False, False, False
         reading = "unverified"
+        if spec.orientation in {"inward", "outward"}:
+            source = "user-declared"
     return {
         "source": source,
+        "orientation_source": source,
         "inward_fraction": adentro,
         "outward_fraction": afuera,
         "flip_normals": bool(flip),
@@ -243,6 +267,8 @@ class VcRenderTifxyzRenderer:
             except ValidationError as exc:
                 issues.append(Issue("error", "bad-ct", str(exc)))
         spec = segment.render or RenderSpec()
+        if spec.scale <= 0:
+            issues.append(Issue("error", "scale", "render --scale must be positive"))
         if spec.slice_step != 1:
             issues.append(Issue("error", "slice-step", "v0 only supports --slice-step 1"))
         if spec.num_slices is not None and spec.num_slices < 1:
@@ -256,13 +282,25 @@ class VcRenderTifxyzRenderer:
         except RenderError as exc:
             issues.append(Issue("error", "missing-renderer", str(exc)))
         if spec.umbilicus is None and spec.orientation == "auto":
-            issues.append(
-                Issue(
-                    "warning",
-                    "unverified-orientation",
-                    "no umbilicus: normal direction and reading orientation are unverified",
+            if profile.execution.direction == "both":
+                issues.append(
+                    Issue(
+                        "warning",
+                        "unverified-orientation",
+                        "no umbilicus: normal direction and reading orientation are "
+                        "unverified; direction=both keeps both stacks",
+                    )
                 )
-            )
+            else:
+                issues.append(
+                    Issue(
+                        "error",
+                        "unverified-orientation",
+                        f"{profile.execution.direction}-only profile and no umbilicus: "
+                        "pass --umbilicus or --normal inward|outward. The SDK will not "
+                        "guess the depth direction for a single-direction map.",
+                    )
+                )
         return issues
 
     def render(
@@ -282,6 +320,14 @@ class VcRenderTifxyzRenderer:
         pixel_um = ct["pixel_um"] or segment.pixel_um
         if pixel_um is None:
             raise RenderError("CT has no scale; pass --voxel-um")
+        mx, my, mz = _mesh_arrays(mesh)
+        valid = (mx > 0) & (my > 0) & (mz > 0) & np.isfinite(mx) & np.isfinite(my) & np.isfinite(mz)
+        if not valid.any():
+            raise RenderError(f"mesh has no valid coordinates: {mesh}")
+        shape_xyz = np.array(ct["shape_zyx"][::-1], dtype=np.float64)
+        points = np.stack([mx[valid], my[valid], mz[valid]], axis=-1)
+        if np.any(points < 0) or np.any(points > shape_xyz - 1):
+            raise RenderError("mesh coordinates fall outside the CT volume")
 
         mesh_hashes = {axis: sha256_file(mesh / f"{axis}.tif") for axis in "xyz"}
         meta_path = mesh / "meta.json"
@@ -309,6 +355,8 @@ class VcRenderTifxyzRenderer:
         if cache_dir.is_dir() and (cache_dir / "0").exists() and receipt_path.is_file():
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
             receipt["cache_hit"] = True
+            receipt["roi"] = list(spec.roi) if spec.roi else None
+            receipt["roi_application"] = "post-render-in-prepare" if spec.roi else None
             array = _read_render(cache_dir)
             return RenderedVolume(
                 path=cache_dir,
@@ -319,7 +367,11 @@ class VcRenderTifxyzRenderer:
                 cache_hit=True,
             )
 
-        estimated = int(num_slices) * int(ct["shape_zyx"][1]) * int(ct["shape_zyx"][2])
+        # Estimate the auto-cropped canvas from the mesh, not the whole CT: a
+        # small scroll patch on a huge CT must not trip the memory guard.
+        bbox_y = int(np.ceil((float(points[:, 1].max()) - float(points[:, 1].min())) / float(spec.scale))) + 3
+        bbox_x = int(np.ceil((float(points[:, 0].max()) - float(points[:, 0].min())) / float(spec.scale))) + 3
+        estimated = int(num_slices) * max(bbox_y, 1) * max(bbox_x, 1)
         limit = int(float(ctx.max_render_gb) * (1024**3))
         if estimated > limit:
             raise RenderError(
@@ -328,6 +380,15 @@ class VcRenderTifxyzRenderer:
                 "or a smaller mesh"
             )
 
+        if not _supports(binary, "--scale"):
+            raise RenderError(
+                f"{binary} does not advertise --scale; the pinned renderer must "
+                "support native-scale output"
+            )
+        supports_auto_crop = _supports(binary, "--auto-crop")
+        supports_flip = _supports(binary, "--flip-normals")
+        supports_slice_step = _supports(binary, "--slice-step")
+        python_flip = bool(orientation["flip_normals"]) and not supports_flip
         cmd = [
             *prefix,
             "-v", str(ct["path"]),
@@ -335,12 +396,14 @@ class VcRenderTifxyzRenderer:
             "--scale", str(float(spec.scale)),
             "-s", str(mesh),
             "-n", str(int(num_slices)),
-            "--slice-step", str(int(spec.slice_step)),
             "--zarr-output", "{stage}",
             "--zarr-compressor", "none",
-            "--auto-crop",
         ]
-        if orientation["flip_normals"]:
+        if supports_slice_step:
+            cmd.extend(["--slice-step", str(int(spec.slice_step))])
+        if supports_auto_crop:
+            cmd.append("--auto-crop")
+        if orientation["flip_normals"] and supports_flip:
             cmd.append("--flip-normals")
 
         cache_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -363,6 +426,8 @@ class VcRenderTifxyzRenderer:
                 raise RenderError(
                     f"renderer wrote {array.shape[0]} slices, expected {num_slices}"
                 )
+            if python_flip:
+                array = array[::-1]
             if orientation["traspuesta"]:
                 array = array.transpose(0, 2, 1)
             if orientation["filas_invertidas"]:
@@ -388,7 +453,9 @@ class VcRenderTifxyzRenderer:
                 "num_slices": int(num_slices),
                 "slice_step": int(spec.slice_step),
                 "orientation": orientation,
-                "auto_crop": True,
+                "auto_crop": bool(supports_auto_crop),
+                "slice_step_passed": bool(supports_slice_step),
+                "flip_normals_python": python_flip,
                 "roi": list(spec.roi) if spec.roi else None,
                 "roi_application": "post-render-in-prepare" if spec.roi else None,
                 "shape_zyx": [int(v) for v in array.shape],

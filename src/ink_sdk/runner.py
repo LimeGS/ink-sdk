@@ -18,14 +18,14 @@ import numpy as np
 import tifffile
 
 from . import __version__
-from .contracts import InkResult, InkVolume, RunContext, Segment, dump_json
-from .errors import DegenerateMapError, InkSDKError, ValidationError
-from .io import sha256_file, write_json, write_zarr
+from .contracts import InkResult, InkVolume, RunContext, Segment
+from .errors import DegenerateMapError, ValidationError
+from .io import write_json, write_zarr
 from .liveness import assess_liveness, forward_reverse_asymmetry
 from .prepare import prepare_input
 from .profiles import ModelProfile
 from .registry import get_adapter
-from .renderers.base import DummyRenderer, Renderer
+from .renderers.base import Renderer
 from .renderers.vc_render_tifxyz import VcRenderTifxyzRenderer
 from .resolver import inspect_plan, with_render_spec
 
@@ -44,10 +44,15 @@ def _workdir(ctx: RunContext) -> Path:
 
 def _prepare_out(out_dir: Path, overwrite: bool) -> Path:
     out_dir = Path(out_dir)
-    if out_dir.exists() and any(out_dir.iterdir()) and not overwrite:
+    if out_dir.exists() and not out_dir.is_dir():
+        raise ValidationError(f"output path is not a directory: {out_dir}")
+    populated = out_dir.is_dir() and any(out_dir.iterdir())
+    if populated and not overwrite:
         raise ValidationError(
             f"output directory is not empty: {out_dir}. Pass --overwrite to replace files."
         )
+    if populated:
+        shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     return out_dir
 
@@ -183,7 +188,6 @@ def infer(
         if raw.volume is not None:
             volume_path = output / "ink_3d.zarr"
             write_zarr(volume_path, raw.volume, attrs=raw.volume_attrs, overwrite=ctx.overwrite)
-            depth = int(raw.volume.shape[0])
             interval = raw.volume_attrs.get("evaluated_z_interval")
             volume = InkVolume(
                 path=volume_path,
@@ -298,9 +302,9 @@ def render_segment(
             "pixel_um": current.pixel_um,
             "issues": issues,
         }
+    output = _prepare_out(Path(out_dir), ctx.overwrite) if out_dir is not None else None
     rendered = renderer_impl.render(current, current.render, profile, ctx)
-    if out_dir is not None:
-        output = _prepare_out(Path(out_dir), ctx.overwrite)
+    if output is not None:
         _publish_render(rendered, output, ctx.overwrite)
     return rendered
 
@@ -336,7 +340,7 @@ def doctor(
             add(module, True, getattr(imported, "__version__", "installed"))
         except ImportError as exc:
             add(module, False, str(exc))
-    for module, required in (("scipy", False), ("torch", False)):
+    for module, required in (("scipy", False), ("torch", False), ("huggingface_hub", False)):
         try:
             imported = __import__(module)
             add(module, True, getattr(imported, "__version__", "installed"), required=required)
@@ -376,6 +380,25 @@ def doctor(
         candidates = [villa_path / "ink-detection", villa_path]
         found = next((c for c in candidates if (c / "koine_machines" / "inference" / "infer.py").is_file()), None)
         add("villa", found is not None, str(found or villa_path), required=False)
+        if found is not None:
+            env = dict(os.environ)
+            env["PYTHONPATH"] = str(found) + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+            try:
+                imported = subprocess.run(
+                    [sys.executable, "-c", "import koine_machines.inference.infer, vesuvius"],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    env=env,
+                )
+                add(
+                    "villa-import",
+                    imported.returncode == 0,
+                    (imported.stderr or "ok").strip()[-500:],
+                    required=False,
+                )
+            except (OSError, subprocess.SubprocessError) as exc:
+                add("villa-import", False, str(exc), required=False)
     else:
         add("villa", False, "not configured (VILLA)", required=False)
 
@@ -391,6 +414,7 @@ def doctor(
             {
                 "id": profile.id,
                 "path": str(path),
+                "upstream_path": profile.upstream_checkpoint_path,
                 "present": path.is_file(),
                 "size_matches": size == profile.checkpoint.bytes if size is not None else False,
             }

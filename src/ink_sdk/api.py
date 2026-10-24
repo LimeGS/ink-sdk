@@ -5,10 +5,10 @@ from __future__ import annotations
 import dataclasses
 from pathlib import Path
 
-from .contracts import InkResult, RenderSpec, RunContext, Segment
+from .contracts import InkResult, RunContext, Segment
 from .profiles import ModelProfile
 from .registry import get_profile, list_profiles
-from .resolver import build_segment, inspect_plan
+from .resolver import build_segment
 from .runner import doctor as _doctor
 from .runner import infer as _infer
 from .runner import inspect as _inspect
@@ -55,6 +55,7 @@ class InkSDK:
         tifxyz: Path | None = None,
         ct: Path | None = None,
         voxel_um: float | None = None,
+        pixel_um: tuple[float, float, float] | None = None,
         render: bool = False,
         ctx: RunContext | None = None,
         **ctx_overrides,
@@ -68,6 +69,7 @@ class InkSDK:
             tifxyz=tifxyz,
             ct=ct,
             voxel_um=voxel_um,
+            pixel_um=pixel_um,
             force_render=render,
         )
 

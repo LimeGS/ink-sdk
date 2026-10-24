@@ -13,6 +13,7 @@ license = "MIT"
 
 [checkpoint]
 path = "canonical/r152_3ddec_v2_l5_epoch13.ckpt"
+upstream_path = "r152_3ddec_v2_l5_epoch13.ckpt"
 sha256 = "36dd0de84b7b7aa6590184192c7415466cd8a1ba7c1e59f42c6373846373c3e0"
 bytes = 1549556213
 

@@ -81,7 +81,7 @@ class HecateAdapter(BaseAdapter):
                 f"Hecate needs {patch_depth} layers, the prepared volume has {volume.shape[0]}"
             )
         height, width = volume.shape[1:]
-        precision = str(profile.execution.amp).lower()
+        precision = str(ctx.amp or profile.execution.amp).lower()
         if precision in {"default", "fp32", "fp16"}:
             precision = "fp32"
         elif precision == "bf16":

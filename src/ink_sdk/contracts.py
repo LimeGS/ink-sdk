@@ -76,6 +76,7 @@ class RunContext:
     on_degenerate: str = "fail"  # fail | warn
     resample_from_um: float | None = None
     output_3d: bool = False
+    amp: str | None = None
     roi: tuple[int, int, int, int] | None = None
     normal: str = "auto"  # auto | inward | outward
     umbilicus: Path | None = None

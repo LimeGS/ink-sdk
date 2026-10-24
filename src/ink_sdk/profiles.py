@@ -31,8 +31,17 @@ class Source(_Strict):
 
 class Checkpoint(_Strict):
     path: str
+    upstream_path: str | None = None
     sha256: str
     bytes: int
+
+    @field_validator("path")
+    @classmethod
+    def _relative_path(cls, value: str) -> str:
+        path = Path(value)
+        if path.is_absolute() or ".." in path.parts:
+            raise ValueError("checkpoint.path must stay under the models directory")
+        return value
 
     @field_validator("sha256")
     @classmethod
@@ -155,13 +164,14 @@ class ModelProfile(_Strict):
                 f"{self.id}: adapter {self.adapter} declares family {allowed[self.adapter]}, "
                 f"not {self.family!r}"
             )
-        if self.execution.direction == "both" and self.output.primary == "reverse":
-            # A reverse-only primary from a both run is representable; keep it.
-            pass
         return self
 
     def checkpoint_path(self, models_dir: Path) -> Path:
         return Path(models_dir) / self.checkpoint.path
+
+    @property
+    def upstream_checkpoint_path(self) -> str:
+        return self.checkpoint.upstream_path or self.checkpoint.path
 
     def verify_checkpoint(self, models_dir: Path) -> Path:
         path = self.checkpoint_path(models_dir)

@@ -12,13 +12,7 @@ import zarr
 
 from .contracts import RenderSpec, RunContext, Segment
 from .errors import IncompatibleScaleError, ValidationError
-from .io import (
-    ct_preflight,
-    open_volume_array,
-    ordered_tiff_stack,
-    pixel_um_from_sidecar,
-    pixel_um_from_zarr,
-)
+from .io import ct_preflight, ordered_tiff_stack, pixel_um_from_sidecar, pixel_um_from_zarr
 from .prepare import plan_scale
 from .profiles import ModelProfile
 
@@ -56,7 +50,12 @@ def candidate_volumes(path: Path) -> list[Path]:
     for child in sorted(path.iterdir()):
         if child.suffix in {".zarr", ".npy", ".tif", ".tiff"}:
             candidates.append(child)
-        elif child.is_dir() and (any(child.glob("*.tif")) or (child / "0" / ".zarray").is_file()):
+        elif child.is_dir() and (
+            any(child.glob("*.tif"))
+            or (child / "0" / ".zarray").is_file()
+            or (child / "zarr.json").is_file()
+            or (child / "0" / "zarr.json").is_file()
+        ):
             candidates.append(child)
     if not candidates:
         raise ValidationError(f"no surface volumes found in {path}")

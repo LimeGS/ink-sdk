@@ -13,6 +13,7 @@ license = "MIT"
 
 [checkpoint]
 path = "reader-v2/reader-v2-step040000.pth"
+upstream_path = "reader-v2-step040000.pth"
 sha256 = "654ec5acec2b6c4788d9cb326e2f0b8c2c730584949a934ef775db7f6ab5d3a6"
 bytes = 138382373
 

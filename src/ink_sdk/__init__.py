@@ -7,8 +7,8 @@ from __future__ import annotations
 
 __version__ = "0.1.0"
 
-from .api import InkSDK  # noqa: E402
-from .errors import (  # noqa: E402
+from .api import InkSDK
+from .errors import (
     DegenerateMapError,
     IncompatibleScaleError,
     InkSDKError,
@@ -19,13 +19,13 @@ from .errors import (  # noqa: E402
 )
 
 __all__ = [
+    "DegenerateMapError",
+    "IncompatibleScaleError",
     "InkSDK",
     "InkSDKError",
-    "ValidationError",
-    "IncompatibleScaleError",
-    "ModelIntegrityError",
     "MissingDependencyError",
+    "ModelIntegrityError",
     "RenderError",
-    "DegenerateMapError",
+    "ValidationError",
     "__version__",
 ]

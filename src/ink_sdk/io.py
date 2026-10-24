@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -73,7 +72,15 @@ def _ome_scale(attrs: dict[str, Any]) -> tuple[float, float, float] | None:
 
 
 def pixel_um_from_zarr(path: Path) -> tuple[float, float, float] | None:
-    return _ome_scale(zarr_attrs(path))
+    attrs = zarr_attrs(path)
+    scale = _ome_scale(attrs)
+    if scale is not None:
+        return scale
+    try:
+        array = _zarr_group(path)["0"]
+        return _ome_scale(dict(array.attrs))
+    except Exception:
+        return None
 
 
 def pixel_um_from_sidecar(path: Path) -> tuple[float, float, float] | None:
@@ -190,7 +197,11 @@ def ct_preflight(path: Path) -> dict[str, Any]:
     ):
         raise ValidationError(f"CT 0/.zarray has an invalid shape: {shape!r}")
     chunks = meta.get("chunks")
-    if not isinstance(chunks, list) or len(chunks) != 3:
+    if (
+        not isinstance(chunks, list)
+        or len(chunks) != 3
+        or any(not isinstance(v, int) or v <= 0 for v in chunks)
+    ):
         raise ValidationError(f"CT 0/.zarray has invalid chunks: {chunks!r}")
     attrs = zarr_attrs(path)
     attrs_path = path / "0" / ".zattrs"

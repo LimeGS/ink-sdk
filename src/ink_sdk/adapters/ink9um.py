@@ -16,7 +16,8 @@ import numpy as np
 import tifffile
 
 from ..contracts import Issue, PreparedInput, RawOutput, RunContext, Segment
-from ..errors import InkSDKError, MissingDependencyError, ModelIntegrityError, ValidationError
+from ..errors import InkSDKError, MissingDependencyError
+from ..io import write_zarr
 from ..profiles import ModelProfile
 from .base import BaseAdapter, source_scale_issue, stats
 
@@ -25,7 +26,7 @@ def _villa_python_path(ctx: RunContext) -> tuple[Path, Path]:
     root = ctx.villa or os.environ.get("VILLA")
     if not root:
         raise MissingDependencyError(
-            "6 um/9 um inference needs a ScrollPrize/villa checkout. Set VILLA or pass "
+            "9 um inference needs a ScrollPrize/villa checkout. Set VILLA or pass "
             "--villa; the pinned revision is in the profile."
         )
     root = Path(root).expanduser()
@@ -88,6 +89,21 @@ class Ink9umAdapter(BaseAdapter):
         villa_root, python_path = _villa_python_path(ctx)
         work = Path(ctx.workdir or ".") / "ink9um"
         work.mkdir(parents=True, exist_ok=True)
+        input_path = Path(prepared.path)
+        is_zarr = input_path.is_dir() and (
+            (input_path / "0" / ".zarray").is_file()
+            or (input_path / "zarr.json").is_file()
+            or (input_path / "0" / "zarr.json").is_file()
+        )
+        if not is_zarr:
+            # Upstream reads OME-Zarr only; npy/TIFF inputs must be materialised.
+            input_path = work / "prepared.zarr"
+            write_zarr(
+                input_path,
+                prepared.array,
+                attrs={"pixel_um": list(prepared.pixel_um)},
+                overwrite=True,
+            )
         output = work / "ink.tif"
         if output.exists():
             output.unlink()
@@ -100,7 +116,7 @@ class Ink9umAdapter(BaseAdapter):
             interpreter,
             "-m",
             "koine_machines.inference.infer",
-            str(prepared.path),
+            str(input_path),
             str(checkpoint),
             str(output),
             "--overlap",
@@ -112,7 +128,7 @@ class Ink9umAdapter(BaseAdapter):
             "--batch-size",
             str(profile.execution.batch),
             "--amp-dtype",
-            str(profile.execution.amp),
+            str(ctx.amp or profile.execution.amp),
             "--no-compile",
         ]
         env = dict(os.environ)
@@ -122,9 +138,17 @@ class Ink9umAdapter(BaseAdapter):
             command, capture_output=True, text=True, timeout=6 * 3600, env=env
         )
         if completed.returncode != 0:
+            tail = (completed.stderr or completed.stdout)[-3000:]
+            hint = ""
+            if "No module named 'vesuvius'" in tail:
+                hint = (
+                    " The VILLA inference environment needs the `vesuvius` package "
+                    "importable (the 9 um model builder imports it); activate the "
+                    "VILLA environment or add it to PYTHONPATH."
+                )
             raise InkSDKError(
                 f"koine_machines.inference.infer failed with exit {completed.returncode}: "
-                f"{(completed.stderr or completed.stdout)[-3000:]}"
+                f"{tail}{hint}"
             )
         maps: dict[str, np.ndarray] = {}
         expected_shape = prepared.array.shape[1:]
@@ -172,13 +196,14 @@ class Ink9umAdapter(BaseAdapter):
             receipt={
                 "adapter": "ink9um",
                 "command": command,
+                "input": str(input_path),
                 "villa": str(villa_root),
                 "villa_revision": villa_revision,
                 "checkpoint": str(checkpoint),
                 "direction": profile.execution.direction,
                 "blend": profile.execution.blend,
                 "batch": profile.execution.batch,
-                "amp": profile.execution.amp,
+                "amp": ctx.amp or profile.execution.amp,
                 "runtime_seconds": round(time.time() - started, 2),
                 "statistics": {key: stats(value) for key, value in maps.items()},
                 "non_claims": [
