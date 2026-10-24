@@ -100,8 +100,9 @@ The three adapters are deliberately different:
   upstream inference dependencies and a CUDA-capable environment for its
   default bf16 path. The VILLA environment must also make the `vesuvius`
   package importable (the 9 µm model builder uses it); `doctor --villa` checks
-  both imports. On CPU, pass `--amp default` or `--amp fp32`. It produces
-  forward, reverse and mean when the profile runs both directions.
+  both imports. `imagecodecs` is required for the upstream TIFF maps and is
+  included in the `ink9um` extra. On CPU, pass `--amp default` or `--amp fp32`.
+  It produces forward, reverse and mean when the profile runs both directions.
 - **canonical2um** runs the vendored ResNet-152 + 3D decoder in-process. It
   uses 62 central layers, 256 px tiles with stride 128, a Hann window, and
   `/255` normalisation. It needs `torch`.
@@ -213,25 +214,33 @@ checkpoint produces a scientifically valid map.
 
 ## Status and limits
 
-Implemented and tested synthetically:
+Implemented and tested:
 
 - five pinned profiles and the scale matrix;
 - native/pool/resample preparation and ROI cropping;
 - dummy end-to-end pipeline, receipts and liveness;
 - canonical/Hecate/9 µm adapters against fake models and a fake upstream;
-- the real Hecate 2.4 checkpoint loaded and ran a 2D CPU inference on a
-  synthetic 64×256×256 volume (near-zero output, as expected for random CT;
-  this is a smoke test, not a scientific result);
+- all five profiles end to end on a Vast.ai CUDA host with the pinned
+  checkpoints and the official `vc_render_tifxyz`:
+  - both 9 µm profiles on a real PHerc0306B 8.64 µm CT and real tifxyz
+    (primary maps ALIVE);
+  - canonical 2 µm on a 2.4 µm render (ALIVE on a non-ink window);
+  - Hecate 9.6 µm on a 9.6 µm render (ALIVE);
+  - Hecate 2.4 µm on a real PHercParis4 2.4 µm CT crop, including an
+    ink-rich 256×256 window (ALIVE) and `--output-3d`;
 - official renderer argv, orientation, cache, receipt and fallbacks;
 - CLI `models`, `doctor`, `inspect`, `render`, `infer`, `fetch`.
 
-Not verified in this checkout:
+Not verified:
 
-- a real end-to-end golden run, because the pinned checkpoints are not local;
-- the real Linux `vc_render_tifxyz` binary, which is not available on macOS;
-- a real `koine_machines` run, which needs a VILLA checkout, its `vesuvius`
-  dependency, and a compatible runtime;
-- real canonical weights, Hecate 9.6 weights, and a GPU.
+- a real 2.4 µm tifxyz with along-surface geometry; the 2.4 µm GPU test used
+  a flat 256×256 mesh inside a real PHercParis4 surface volume;
+- scientific correctness, calibration, ink calls, or OCR. Liveness only says
+  that a map carries a decision, not that the decision is right;
+- Hecate 2.4 µm on the synthetic 2.4 µm volume is DEGENERATE and is treated as
+  out of distribution, not as a passing lane;
+- a fully inked canonical window saturates near 0.95 and the liveness gate
+  flags it DEGENERATE; that is a gate limitation on saturated maps.
 
 The SDK is ready to run once those external artifacts are present. It deliberately
 fails closed when a checkpoint, renderer, scale, orientation, or dependency is

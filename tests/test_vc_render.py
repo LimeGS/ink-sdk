@@ -82,6 +82,27 @@ def test_render_command_and_cache(tmp_path, mesh, ct, monkeypatch):
     assert len(log.read_text().splitlines()) == 1
 
 
+def test_explicit_scale_wins_over_ct_metadata(tmp_path, mesh, ct):
+    binary = _fake_renderer(tmp_path)
+    profile = get_profile("ink_9um@scrollprize-seed43-step75000")
+    ctx = RunContext(
+        renderer=binary,
+        cache_dir=tmp_path / "cache",
+        workdir=tmp_path / "work",
+        render_cache=tmp_path / "render-cache",
+        overwrite=True,
+    )
+    segment = build_segment(
+        profile=profile, ctx=ctx, tifxyz=mesh, ct=ct, voxel_um=8.64, force_render=True
+    )
+    current = with_render_spec(segment, profile, ctx)
+    assert current.render is not None
+    rendered = VcRenderTifxyzRenderer().render(current, current.render, profile, ctx)
+    assert rendered.pixel_um == pytest.approx((8.64, 8.64, 8.64))
+    receipt = json.loads((rendered.path / "RENDER_RECEIPT.json").read_text())
+    assert receipt["pixel_um"] == [8.64, 8.64, 8.64]
+
+
 def test_single_direction_profile_requires_orientation(tmp_path, mesh, ct):
     profile = get_profile("canonical_2um@r152-3ddec-v2-l5-epoch13")
     segment = Segment(

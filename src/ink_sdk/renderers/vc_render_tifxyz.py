@@ -317,7 +317,9 @@ class VcRenderTifxyzRenderer:
         num_slices = spec.num_slices or _derive_num_slices(segment, profile)
         orientation = _orientation(mesh, spec)
         ct = ct_preflight(ct)
-        pixel_um = ct["pixel_um"] or segment.pixel_um
+        # An explicit --voxel-um / CLI scale must win over OME metadata, whose
+        # level-0 multiscale is often unitless [1, 1, 1].
+        pixel_um = segment.pixel_um or ct["pixel_um"]
         if pixel_um is None:
             raise RenderError("CT has no scale; pass --voxel-um")
         mx, my, mz = _mesh_arrays(mesh)

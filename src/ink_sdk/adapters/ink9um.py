@@ -66,6 +66,17 @@ class Ink9umAdapter(BaseAdapter):
             _villa_python_path(ctx or RunContext())
         except MissingDependencyError as exc:
             issues.append(Issue("error", "missing-villa", str(exc)))
+        try:
+            import imagecodecs  # noqa: F401
+        except ImportError:
+            issues.append(
+                Issue(
+                    "error",
+                    "missing-imagecodecs",
+                    "9 um inference needs imagecodecs to read/write upstream TIFF maps; "
+                    "install ink-sdk[ink9um]",
+                )
+            )
         checkpoint = profile.checkpoint_path(
             (ctx.models_dir if ctx and ctx.models_dir else Path(os.environ.get("INK_SDK_MODELS", Path.home() / ".cache" / "ink-sdk" / "models")))
         )

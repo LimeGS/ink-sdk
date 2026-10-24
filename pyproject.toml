@@ -14,7 +14,7 @@ dependencies = [
   "numpy>=1.26",
   "pydantic>=2",
   "typer>=0.12",
-  "zarr>=2.18",
+  "zarr>=3",
   "tifffile>=2024.1",
 ]
 
@@ -22,9 +22,9 @@ dependencies = [
 render = ["scipy>=1.11"]
 canonical = ["torch>=2.2"]
 hecate = ["torch>=2.2", "scipy>=1.11"]
-ink9um = ["torch>=2.2"]
+ink9um = ["torch>=2.2", "imagecodecs>=2024.1"]
 fetch = ["huggingface_hub>=0.23"]
-all = ["scipy>=1.11", "torch>=2.2", "huggingface_hub>=0.23"]
+all = ["scipy>=1.11", "torch>=2.2", "imagecodecs>=2024.1", "huggingface_hub>=0.23"]
 test = ["pytest>=8", "pytest-cov"]
 
 [project.scripts]

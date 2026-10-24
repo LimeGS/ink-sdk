@@ -348,7 +348,7 @@ def doctor(
             add(module, True, getattr(imported, "__version__", "installed"))
         except ImportError as exc:
             add(module, False, str(exc))
-    for module, required in (("scipy", False), ("torch", False), ("huggingface_hub", False)):
+    for module, required in (("scipy", False), ("torch", False), ("imagecodecs", False), ("huggingface_hub", False)):
         try:
             imported = __import__(module)
             add(module, True, getattr(imported, "__version__", "installed"), required=required)
