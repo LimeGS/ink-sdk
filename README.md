@@ -76,7 +76,8 @@ later by `prepare`, not baked into the renderer. The renderer receipt records
 the command, binary hash, CT zarray hash, mesh hashes, orientation and cache
 key. Renders are cached by all of those inputs.
 
-v0 does not download remote CT. Put the level-0 OME-Zarr on local disk.
+v0 does not download remote CT. Put the level-0 OME-Zarr on local disk. The CT
+reader currently requires the v2 layout (`<ct>/0/.zarray`), not Zarr v3.
 
 ## Profiles
 
