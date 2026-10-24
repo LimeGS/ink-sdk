@@ -1,11 +1,16 @@
 # ink-sdk
 
-Standalone inference for Vesuvius ink models. Give it an already rendered
-surface volume, or a `tifxyz` mesh plus a local OME-Zarr CT. It writes a
-probability map, a preview, a receipt and a liveness verdict. Hecate can also
-write a 3D zarr.
+Standalone inference for Vesuvius ink models. Give it an already rendered surface volume, or a `tifxyz`
+mesh plus a local OME-Zarr CT. It writes a probability map, a preview, a receipt and a liveness verdict.
+Hecate can also write a 3D zarr.
 
 **Inference only.** No training, fine-tuning, OCR or scientific evaluation.
+
+![ink-sdk on PHerc1447 w058](docs/img/sdk_w058.png)
+
+*One real run on public data (PHerc1447 w058; the human ink label is shown for reference only). The same
+9 µm model sees ink in one depth order and is blind in the other, and both maps pass the liveness gate, so
+the depth direction matters.*
 
 ## Quick start
 
@@ -40,24 +45,10 @@ ink-sdk infer \
   --out runs/hecate-2.4
 ```
 
-A surface-volume run produces:
-
-```text
-runs/hecate-2.4/
-├── probability.npy
-├── preview.tif
-└── INK_SDK_RECEIPT.json
-```
-
-A mesh run also writes `render/` with the render array and
-`RENDER_RECEIPT.json`. Add `--output-3d` to Hecate to also get `ink_3d.zarr`.
-`ink-sdk fetch` is opt-in: inference never downloads weights. `ink-sdk doctor`
-marks each checkpoint `verified`, `missing` or `present-but-unverified`.
+`ink-sdk fetch` is opt-in: inference never downloads weights. `ink-sdk doctor` marks each checkpoint
+`verified`, `missing` or `present-but-unverified`.
 
 ## Models
-
-`ink-sdk models` lists the five pinned profiles; `ink-sdk models --json` also
-shows checkpoint paths and SHA-256 values.
 
 | Profile | Scale | Depth | Output | Notes |
 |---|---:|---:|---|---|
@@ -67,9 +58,30 @@ shows checkpoint paths and SHA-256 values.
 | `hecate@2.4um` | 2.4 ± 0.048 µm | 64 | 2D / 3D | 3D with `--output-3d` |
 | `hecate@9.6um` | 9.6 ± 0.192 µm | 16 | 2D / 3D | 3D with `--output-3d` |
 
-Most model examples below start from a surface volume. For a mesh, replace
-`--surface-volume ... --pixel-um ...` with `--tifxyz ... --ct ... --voxel-um
-...`; canonical and Hecate also require `--normal inward|outward` for a mesh.
+`ink-sdk models` lists them; `ink-sdk models --json` also shows checkpoint paths and SHA-256 values.
+
+## What a run writes
+
+| File | Meaning |
+|---|---|
+| `probability.npy` | Forward map, float32 `[0, 1]`, shape `(y, x)` |
+| `probability_reverse.npy`, `probability_mean.npy` | Extra maps when produced |
+| `probability_primary.npy` | Copy of the selected map when the primary is not forward |
+| `preview.tif` | Display preview of the primary map |
+| `ink_3d.zarr` | Hecate 3D output with `--output-3d` |
+| `render/` | Render `0` array and `RENDER_RECEIPT.json` when rendered |
+| `INK_SDK_RECEIPT.json` | Profile, checkpoint, scale, render, stats, liveness, environment |
+| `LANE_NOT_USABLE` | Present when the liveness gate refuses the lane |
+
+The receipt is the source of truth. A probability map is not evidence of ink, letters or a First Letter.
+
+---
+
+<details>
+<summary><b>Model notes</b> — 9 µm (seed43, reader-v2), canonical 2 µm, Hecate 2.4 / 9.6</summary>
+
+Most examples start from a surface volume. For a mesh, replace `--surface-volume ... --pixel-um ...` with
+`--tifxyz ... --ct ... --voxel-um ...`; canonical and Hecate also require `--normal inward|outward` for a mesh.
 
 ### 9 µm: seed43 and reader-v2
 
@@ -84,15 +96,14 @@ ink-sdk infer \
   --out runs/seed43
 ```
 
-Swap the profile ID for `ink_9um@reader-v2-step040000` to run reader-v2. The
-VILLA checkout must contain `ink-detection/koine_machines/inference/infer.py`
-and make `vesuvius` importable. `imagecodecs` is required.
+Swap the profile ID for `ink_9um@reader-v2-step040000` to run reader-v2. The VILLA checkout must contain
+`ink-detection/koine_machines/inference/infer.py` and make `vesuvius` importable. `imagecodecs` is required.
 
-Both profiles produce `forward`, `reverse` and `mean` maps. Use
-`--primary reverse` or `--primary mean` to select a different primary map.
+Both profiles produce `forward`, `reverse` and `mean` maps. Use `--primary reverse` or `--primary mean` to
+select a different primary map.
 
-For an 8.64 µm CT, add `--resample-from-um 8.64` and install the `render` extra
-for `scipy` in addition to `ink9um`:
+For an 8.64 µm CT, add `--resample-from-um 8.64` and install the `render` extra for `scipy` in addition to
+`ink9um`:
 
 ```bash
 ink-sdk infer \
@@ -117,9 +128,9 @@ ink-sdk infer \
   --out runs/canonical
 ```
 
-The adapter uses 62 central layers, 256 px tiles and a Hann window. It accepts
-2.399 ± 0.05 µm and has no pooling or upsampling path. The input must have at
-least 62 layers. `--deterministic` enables deterministic PyTorch algorithms.
+The adapter uses 62 central layers, 256 px tiles and a Hann window. It accepts 2.399 ± 0.05 µm and has no
+pooling or upsampling path. The input must have at least 62 layers. `--deterministic` enables deterministic
+PyTorch algorithms.
 
 ### Hecate 2.4 µm
 
@@ -132,9 +143,8 @@ ink-sdk infer \
   --out runs/hecate-2.4
 ```
 
-Hecate 2.4 uses 64 layers. It does not resample. `--output-3d` adds
-`ink_3d.zarr`; only the evaluated depth interval is populated. The checkpoint
-runs in fp32 by default; `--amp bf16` is available on CUDA.
+Hecate 2.4 uses 64 layers. It does not resample. `--output-3d` adds `ink_3d.zarr`; only the evaluated depth
+interval is populated. The checkpoint runs in fp32 by default; `--amp bf16` is available on CUDA.
 
 ### Hecate 9.6 µm
 
@@ -146,10 +156,13 @@ ink-sdk infer \
   --out runs/hecate-9.6
 ```
 
-Hecate 9.6 uses 16 layers. A 2.4 µm source is pooled 4× to 9.6 µm; a native
-8.64 µm source is rejected. Add `--output-3d` for a 3D zarr.
+Hecate 9.6 uses 16 layers. A 2.4 µm source is pooled 4× to 9.6 µm; a native 8.64 µm source is rejected.
+Add `--output-3d` for a 3D zarr.
 
-## Installation options
+</details>
+
+<details>
+<summary><b>Installation options</b> — extras and the external renderer</summary>
 
 `[all]` is the easiest install. Use only the extras you need:
 
@@ -162,20 +175,27 @@ Hecate 9.6 uses 16 layers. A 2.4 µm source is pooled 4× to 9.6 µm; a native
 | `fetch` | `huggingface_hub` | `ink-sdk fetch` |
 | `test` | `pytest`, `pytest-cov` | the test suite |
 
-The external `vc_render_tifxyz` binary is not installed by pip. See
-[Mesh + CT](#mesh--ct).
+The external `vc_render_tifxyz` binary is not installed by pip; see *Inputs* below.
 
-## Surface volume
+If `torch.cuda.is_available()` is `False` after install, the wheel may be built for a newer CUDA than your
+driver; reinstall torch from the matching index, e.g.
+`pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu128`.
 
-`--surface-volume` accepts a ZYX `uint8` array as `.npy`, 3D TIFF, numbered
-TIFF stack, or a Zarr group containing array `0`. Pass `--pixel-um` unless the
-data carries OME/scale metadata. `--voxel-um` is the same override for mesh
-renders.
+</details>
 
-## Mesh + CT
+<details>
+<summary><b>Inputs</b> — surface volume, mesh + CT, renderer, ROI</summary>
 
-A `tifxyz` directory needs `x.tif`, `y.tif`, `z.tif` and a complete
-`meta.json`. The CT must be a local, uint8 OME-Zarr v2:
+### Surface volume
+
+`--surface-volume` accepts a ZYX `uint8` array as `.npy`, 3D TIFF, numbered TIFF stack, or a Zarr group
+containing array `0`. Pass `--pixel-um` unless the data carries OME/scale metadata. `--voxel-um` is the same
+override for mesh renders.
+
+### Mesh + CT
+
+A `tifxyz` directory needs `x.tif`, `y.tif`, `z.tif` and a complete `meta.json`. The CT must be a local,
+uint8 OME-Zarr v2:
 
 ```text
 ct.zarr/
@@ -185,13 +205,12 @@ ct.zarr/
     └── ...
 ```
 
-Only levels that exist may be announced in the multiscale metadata. Zarr v3 CT
-input is not supported; surface volumes may use v3. The SDK never downloads CT
-or surface volumes; only `ink-sdk fetch` uses the network, for weights.
+Only levels that exist may be announced in the multiscale metadata. Zarr v3 CT input is not supported;
+surface volumes may use v3. The SDK never downloads CT or surface volumes; only `ink-sdk fetch` uses the
+network, for weights.
 
-The renderer is the official `vc_render_tifxyz` from volume-cartographer/VC3D,
-usually an AppImage `AppRun`. Pass `--renderer /path/to/AppRun` to `infer` or
-`render`, or set an environment variable:
+The renderer is the official `vc_render_tifxyz` from volume-cartographer/VC3D, usually an AppImage `AppRun`.
+Pass `--renderer /path/to/AppRun` to `infer` or `render`, or set an environment variable:
 
 ```bash
 export INK_SDK_RENDERER=/path/to/AppRun
@@ -199,9 +218,8 @@ export INK_SDK_RENDERER=/path/to/AppRun
 export VC3D_APPRUN=/path/to/AppRun
 ```
 
-Canonical and Hecate need `--normal inward|outward` (or `--umbilicus`) when
-rendering from a mesh; the SDK will not guess the direction. The 9 µm profiles
-run both directions and may omit it.
+Canonical and Hecate need `--normal inward|outward` (or `--umbilicus`) when rendering from a mesh; the SDK
+will not guess the direction. The 9 µm profiles run both directions and may omit it.
 
 Render once, then reuse the result:
 
@@ -221,15 +239,38 @@ ink-sdk infer \
   --out runs/canonical
 ```
 
-`--roi y0,y1,x0,x1` is half-open and applies after scaling, in output-map
-pixels. The render is not cropped to the ROI: the receipt records
-`render_crop = null` and
+`--roi y0,y1,x0,x1` is half-open and applies after scaling, in output-map pixels. The render is not cropped
+to the ROI: the receipt records `render_crop = null` and
 `render_crop_application = "not-implemented-post-render-roi"`.
 
-## Profiles (templates)
+</details>
 
-The five TOMLs in `src/ink_sdk/profiles/` are the default profile templates.
-In an installed wheel, find the packaged copies with:
+<details>
+<summary><b>Scale and orientation</b> — what each profile accepts, and depth direction</summary>
+
+| Source | 9 µm | canonical 2.399 | Hecate 2.4 | Hecate 9.6 |
+|---|---|---|---|---|
+| 2.4 µm | pool 4× → 9.6 | native | native | pool 4× → 9.6 |
+| 2.399 µm | pool 4× → 9.596 | native | native | pool 4× → 9.596 |
+| 8.64 µm | resample → 9.362 with flag | reject | reject | reject |
+| 9.362 µm | native | reject | reject | reject |
+| 9.596 µm | native | reject | reject | native |
+
+If no row applies, the SDK rejects the source instead of stretching it. `--resample-from-um 8.64` is the
+only opt-in resample: XY only, no prefilter.
+
+Without an umbilicus, depth orientation is ambiguous. The 9 µm profiles keep both directions and mark the
+orientation unverified; canonical and Hecate require `--normal` or `--umbilicus` when rendering from a mesh.
+A user-declared normal is recorded as `orientation_source = "user-declared"`; reading orientation remains
+unverified.
+
+</details>
+
+<details>
+<summary><b>Profiles (templates)</b> — use by ID, copy and modify, custom directories</summary>
+
+The five TOMLs in `src/ink_sdk/profiles/` are the default profile templates. In an installed wheel, find the
+packaged copies with:
 
 ```bash
 python -c "import ink_sdk, pathlib; print(pathlib.Path(ink_sdk.__file__).parent / 'profiles')"
@@ -251,21 +292,18 @@ ink-sdk inspect --profile 2.4um ...      # unique suffix also works
 ink-sdk infer --profile ./my-profile.toml ...
 ```
 
-`ink-sdk inspect` is a dry run: it prints the scale/render plan and does not
-load weights.
+`ink-sdk inspect` is a dry run: it prints the scale/render plan and does not load weights.
 
 ### Modify a template
 
-1. Copy a TOML out of `site-packages` or the source tree. Do not edit the
-   installed package; the next install overwrites it.
+1. Copy a TOML out of `site-packages` or the source tree. Do not edit the installed package; the next
+   install overwrites it.
 2. Give it a new unique `id`.
-3. Keep `adapter` and `family` compatible: `ink9um` or `canonical2um` with
-   `surface-volume-2d`, `hecate` with `surface-volume-3d2d`.
-4. Update `checkpoint.path`, `checkpoint.upstream_path`,
-   `checkpoint.sha256` (64 lowercase hex) and `checkpoint.bytes` (exact
-   size). No checkpoint has a default.
-5. Update `source.repo` and `source.revision` if you are registering a
-   different release.
+3. Keep `adapter` and `family` compatible: `ink9um` or `canonical2um` with `surface-volume-2d`, `hecate` with
+   `surface-volume-3d2d`.
+4. Update `checkpoint.path`, `checkpoint.upstream_path`, `checkpoint.sha256` (64 lowercase hex) and
+   `checkpoint.bytes` (exact size). No checkpoint has a default.
+5. Update `source.repo` and `source.revision` if you are registering a different release.
 6. Validate and fetch:
 
 ```bash
@@ -283,8 +321,8 @@ export INK_SDK_PROFILES=$HOME/ink-profiles
 ink-sdk models
 ```
 
-All `*.toml` files in each directory are loaded before the packaged profiles.
-Duplicate IDs are an error, not an override.
+All `*.toml` files in each directory are loaded before the packaged profiles. Duplicate IDs are an error,
+not an override.
 
 ### Profile fields that matter
 
@@ -299,62 +337,31 @@ Duplicate IDs are an error, not an override.
 | `output.primary` | Primary map for preview and `probability_primary.npy` |
 | `output.no_ink_floor` | Recorded in the receipt; not applied as a threshold |
 
-For a full annotated example, start from
-`src/ink_sdk/profiles/hecate-2.4um.toml` and change the `id`, checkpoint and
-model facts. Use `--profile ./my.toml` for one-off runs.
+For a full annotated example, start from `src/ink_sdk/profiles/hecate-2.4um.toml` and change the `id`,
+checkpoint and model facts. Use `--profile ./my.toml` for one-off runs.
 
-## Scale and orientation
+</details>
 
-| Source | 9 µm | canonical 2.399 | Hecate 2.4 | Hecate 9.6 |
-|---|---|---|---|---|
-| 2.4 µm | pool 4× → 9.6 | native | native | pool 4× → 9.6 |
-| 2.399 µm | pool 4× → 9.596 | native | native | pool 4× → 9.596 |
-| 8.64 µm | resample → 9.362 with flag | reject | reject | reject |
-| 9.362 µm | native | reject | reject | reject |
-| 9.596 µm | native | reject | reject | native |
-
-If no row applies, the SDK rejects the source instead of stretching it.
-`--resample-from-um 8.64` is the only opt-in resample: XY only, no prefilter.
-
-Without an umbilicus, depth orientation is ambiguous. The 9 µm profiles keep
-both directions and mark the orientation unverified; canonical and Hecate
-require `--normal` or `--umbilicus` when rendering from a mesh. A user-declared
-normal is recorded as `orientation_source = "user-declared"`; reading
-orientation remains unverified.
-
-## Outputs
-
-`ink-sdk infer --out out/` writes:
-
-| File | Meaning |
-|---|---|
-| `probability.npy` | Forward map, float32 `[0, 1]`, shape `(y, x)` |
-| `probability_reverse.npy`, `probability_mean.npy` | Extra maps when produced |
-| `probability_primary.npy` | Copy of the selected map when `--primary` is not forward |
-| `preview.tif` | Display preview of the primary map |
-| `ink_3d.zarr` | Hecate 3D output with `--output-3d` |
-| `render/` | Render `0` array and `RENDER_RECEIPT.json` when rendered |
-| `INK_SDK_RECEIPT.json` | Profile, checkpoint, scale, render, stats, liveness, environment |
-| `LANE_NOT_USABLE` | Present when the liveness gate refuses the lane |
-
-The receipt is the source of truth. A probability map is not evidence of ink,
-letters or a First Letter. If `out/` is not empty, inference refuses to
-overwrite it unless `--overwrite` is passed.
-
-### Liveness and exit codes
+<details>
+<summary><b>Liveness and exit codes</b></summary>
 
 The gate checks the primary map:
 
 - `EMPTY`: no valid pixels.
-- `DEGENERATE`: `p99 - p50 < 0.05`, `std < 0.02`, or more than 90% of pixels
-  within 0.05 of 0.5.
+- `DEGENERATE`: `p99 - p50 < 0.05`, `std < 0.02`, or more than 90% of pixels within 0.05 of 0.5.
 - `ALIVE`: none of the above.
 
-`--on-degenerate fail` (default) exits 3 and keeps the map and receipt.
-`--on-degenerate warn` continues and exits 0. Exit codes: `0` success, `2`
-validation/dependency/render error, `3` refused degenerate lane.
+`ALIVE` means the map carries a decision, not that the decision is right: in the figure above both maps are
+`ALIVE`.
 
-## CLI
+`--on-degenerate fail` (default) exits 3 and keeps the map and receipt. `--on-degenerate warn` continues and
+exits 0. Exit codes: `0` success, `2` validation/dependency/render error, `3` refused degenerate lane.
+If `out/` is not empty, inference refuses to overwrite it unless `--overwrite` is passed.
+
+</details>
+
+<details>
+<summary><b>CLI and environment variables</b></summary>
 
 ```text
 ink-sdk models [--json]
@@ -365,13 +372,10 @@ ink-sdk render --tifxyz MESH --ct CT [--profile ID|TOML] [--out PATH] [--dry-run
 ink-sdk infer (--surface-volume PATH | --tifxyz MESH --ct CT) --profile ID|TOML ...
 ```
 
-Useful `infer` flags: `--roi`, `--primary`, `--device`, `--amp`,
-`--resample-from-um`, `--normal`, `--umbilicus`, `--output-3d`, `--python`,
-`--villa`, `--renderer`, `--no-render-cache`, `--threads`,
-`--max-render-gb`, `--overwrite`, `--deterministic`, `--dry-run`, `--json`.
-Use `ink-sdk infer --help` for the complete list.
-
-### Environment variables
+Useful `infer` flags: `--roi`, `--primary`, `--device`, `--amp`, `--resample-from-um`, `--normal`,
+`--umbilicus`, `--output-3d`, `--python`, `--villa`, `--renderer`, `--no-render-cache`, `--threads`,
+`--max-render-gb`, `--overwrite`, `--deterministic`, `--dry-run`, `--json`. Use `ink-sdk infer --help` for
+the complete list.
 
 | Variable | Purpose | Default |
 |---|---|---|
@@ -382,56 +386,59 @@ Use `ink-sdk infer --help` for the complete list.
 | `VC3D_APPRUN` | Alternative renderer path | unset |
 | `VILLA` | VILLA checkout for 9 µm | unset |
 
-Command-line options override the corresponding environment variables where
-the command exposes them.
+Command-line options override the corresponding environment variables where the command exposes them.
 
-## Troubleshooting
+</details>
 
-- **`vc_render_tifxyz` not found**: set `--renderer`, `INK_SDK_RENDERER` or
-  `VC3D_APPRUN`; check flags with `ink-sdk doctor --renderer ...`.
+<details>
+<summary><b>Troubleshooting</b></summary>
+
+- **`vc_render_tifxyz` not found**: set `--renderer`, `INK_SDK_RENDERER` or `VC3D_APPRUN`; check flags with
+  `ink-sdk doctor --renderer ...`.
 - **CT has no `0/.zarray`**: use OME-Zarr v2; a Zarr v3 CT is unsupported.
 - **`CT has no pixel_um`**: pass `--voxel-um` or add scale metadata.
-- **`needs ... um`**: check the scale table. For an 8.64 µm source and a 9 µm
-  profile, add `--resample-from-um 8.64`; a 2.4 µm source pools automatically
-  for 9 µm and Hecate 9.6.
+- **`needs ... um`**: check the scale table. For an 8.64 µm source and a 9 µm profile, add
+  `--resample-from-um 8.64`; a 2.4 µm source pools automatically for 9 µm and Hecate 9.6.
 - **`unverified-orientation`**: add `--normal inward|outward` or `--umbilicus`.
 - **`missing-imagecodecs`**: install `ink-sdk[ink9um]`.
 - **`missing-villa` / no `vesuvius`**: set `VILLA` or pass `--villa`; check with
-  `ink-sdk doctor --villa "$VILLA"`.
-- **Checkpoint digest mismatch**: re-run `ink-sdk fetch` or point
-  `--models-dir` at the verified copy.
-- **`DEGENERATE` / exit 3**: keep the receipt for diagnosis;
-  `--on-degenerate warn` finishes but does not make the map scientifically
-  usable.
-- **CUDA requested but unavailable**: use `--device cpu`; 9 µm is intended for
-  CUDA and may be slow on CPU.
+  `ink-sdk doctor --villa "$VILLA"`. If VILLA has its own environment, `infer --python` points at it
+  (`doctor` checks the SDK's own interpreter).
+- **Checkpoint digest mismatch**: re-run `ink-sdk fetch` or point `--models-dir` at the verified copy.
+- **`DEGENERATE` / exit 3**: keep the receipt for diagnosis; `--on-degenerate warn` finishes but does not
+  make the map scientifically usable.
+- **CUDA requested but unavailable**: use `--device cpu`, or see the torch note under *Installation options*;
+  9 µm is intended for CUDA and may be slow on CPU.
 
-## Status and limits
+</details>
+
+<details>
+<summary><b>Status and limits</b></summary>
 
 Validated end to end on a Vast.ai CUDA host with the five pinned checkpoints:
 
 - both 9 µm profiles on a real PHerc0306B 8.64 µm CT and real `tifxyz`;
 - canonical 2 µm on a 2.4 µm render (ALIVE on a non-ink window);
-- Hecate 9.6 µm on a synthetic 9.6 µm surface volume (no real 9.6 µm mesh was
-  available);
-- Hecate 2.4 µm on a real PHercParis4 2.4 µm CT crop, including
-  `--output-3d`.
+- Hecate 9.6 µm on a synthetic 9.6 µm surface volume (no real 9.6 µm mesh was available);
+- Hecate 2.4 µm on a real PHercParis4 2.4 µm CT crop, including `--output-3d`.
+
+Also run on a local RTX 5070: `ink_9um@scrollprize-seed43-step75000` on PHerc1447 w058 (8.64 µm, resample
+path), label AUC 0.757 (reverse) / 0.467 (forward), matching a direct koine run of the same recipe.
 
 Not verified:
 
-- a real 2.4 µm `tifxyz` with along-surface geometry; the GPU test used a flat
-  mesh inside a real surface volume;
+- a real 2.4 µm `tifxyz` with along-surface geometry; the GPU test used a flat mesh inside a real surface
+  volume;
 - scientific correctness, calibration, ink calls or OCR;
-- Hecate 2.4 µm on the synthetic 2.4 µm volume is DEGENERATE and treated as out
-  of distribution;
-- a fully inked canonical window saturates near 0.95 and the liveness gate
-  flags it DEGENERATE.
+- Hecate 2.4 µm on the synthetic 2.4 µm volume is DEGENERATE and treated as out of distribution;
+- a fully inked canonical window saturates near 0.95 and the liveness gate flags it DEGENERATE.
 
-The default tests use synthetic meshes/CT, fake model objects and a fake
-renderer. Real-checkpoint and GPU runs are manual. Local suite: `46 passed`.
+The default tests use synthetic meshes/CT, fake model objects and a fake renderer. Real-checkpoint and GPU
+runs are manual.
+
+</details>
 
 ## License
 
-MIT for this package. Vendored architecture and checkpoint provenance are in
-`THIRD_PARTY_NOTICES.md`; `vc_render_tifxyz` and model weights keep their own
-licenses.
+MIT for this package. Vendored architecture and checkpoint provenance are in `THIRD_PARTY_NOTICES.md`;
+`vc_render_tifxyz` and model weights keep their own licenses.
