@@ -7,11 +7,12 @@ from ink_sdk.profiles import load_profile
 from ink_sdk.registry import get_profile, list_profiles
 
 
-def test_five_builtin_profiles_are_exact():
+def test_builtin_profiles_are_exact():
     ids = {p.id for p in list_profiles()}
     assert ids == {
         "ink_9um@scrollprize-seed43-step75000",
         "ink_9um@reader-v2-step040000",
+        "ink_9um@reader-v3",
         "canonical_2um@r152-3ddec-v2-l5-epoch13",
         "hecate@2.4um",
         "hecate@9.6um",
