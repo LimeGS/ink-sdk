@@ -90,7 +90,7 @@ export VILLA=/opt/ScrollPrize-villa
 
 ink-sdk infer \
   --profile ink_9um@scrollprize-seed43-step75000 \
-  --surface-volume /data/segments/PHerc0306B/surface-volumes/9.362um.zarr \
+  --surface-volume /data/segments/SCROLL/surface-volumes/9.362um.zarr \
   --pixel-um 9.362 \
   --villa "$VILLA" \
   --out runs/seed43
@@ -108,8 +108,8 @@ For an 8.64 µm CT, add `--resample-from-um 8.64` and install the `render` extra
 ```bash
 ink-sdk infer \
   --profile ink_9um@scrollprize-seed43-step75000 \
-  --tifxyz /data/segments/PHerc0306B/mesh \
-  --ct /data/ct/PHerc0306B/level0.zarr \
+  --tifxyz /data/segments/SCROLL/mesh \
+  --ct /data/ct/SCROLL/level0.zarr \
   --voxel-um 8.64 \
   --resample-from-um 8.64 \
   --villa "$VILLA" \
@@ -151,7 +151,7 @@ interval is populated. The checkpoint runs in fp32 by default; `--amp bf16` is a
 ```bash
 ink-sdk infer \
   --profile hecate@9.6um \
-  --surface-volume /data/segments/PHerc0306B/surface-volumes/9.6um.zarr \
+  --surface-volume /data/segments/SCROLL/surface-volumes/9.6um.zarr \
   --pixel-um 9.6 \
   --out runs/hecate-9.6
 ```
@@ -417,7 +417,7 @@ Command-line options override the corresponding environment variables where the 
 
 Validated end to end on a Vast.ai CUDA host with the five pinned checkpoints:
 
-- both 9 µm profiles on a real PHerc0306B 8.64 µm CT and real `tifxyz`;
+- both 9 µm profiles on a real 8.64 µm CT and real `tifxyz`;
 - canonical 2 µm on a 2.4 µm render (ALIVE on a non-ink window);
 - Hecate 9.6 µm on a synthetic 9.6 µm surface volume (no real 9.6 µm mesh was available);
 - Hecate 2.4 µm on a real PHercParis4 2.4 µm CT crop, including `--output-3d`.
