@@ -400,5 +400,51 @@ def orient_cmd(
     typer.echo(text)
 
 
+def _int_list(text: str) -> list[int]:
+    return [int(v) for v in text.replace(" ", "").split(",") if v]
+
+
+def _float_list(text: str) -> list[float]:
+    return [float(v) for v in text.replace(" ", "").split(",") if v]
+
+
+@app.command("battery")
+def battery_cmd(
+    surface_volume: Path = typer.Option(..., "--surface-volume", help="Thick uint8 ZYX surface volume, rendered once."),
+    voxel_um: float = typer.Option(..., "--voxel-um", help="Pixel size of the surface volume."),
+    out: Path = typer.Option(Path("battery"), "--out", "-o"),
+    profile: Optional[list[str]] = typer.Option(None, "--profile", "-p", help="Repeatable; default: every profile."),
+    centres: str = typer.Option("-8,-4,0,4,8", "--centres", help="Window centres, in layers from the middle."),
+    steps: str = typer.Option("1,2", "--steps", help="Layers between consecutive model inputs (depth width)."),
+    thresholds: str = typer.Option("0.5,0.7", "--thresholds"),
+    resample_from_um: Optional[float] = typer.Option(
+        None, "--resample-from-um", help="Opt-in 9 um resample (e.g. 8.64), applied to ink9um profiles only."),
+    device: str = typer.Option("auto", "--device"),
+    villa: Optional[Path] = typer.Option(None, "--villa"),
+    python: Optional[str] = typer.Option(None, "--python"),
+    models_dir: Optional[Path] = typer.Option(None, "--models-dir"),
+    cache_dir: Optional[Path] = typer.Option(None, "--cache-dir"),
+    thumb_px: int = typer.Option(360, "--thumb-px", help="Width of each mosaic tile."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print the cells and the skipped profiles, run nothing."),
+) -> None:
+    """Every profile x depth centre x depth width on one segment: maps, overlays, a mosaic, a stability map."""
+    from .battery import run_battery
+
+    cache_dir = cache_dir or Path(os.environ.get("INK_SDK_CACHE", Path.home() / ".cache" / "ink-sdk"))
+    ctx = _ctx(
+        device=device, cache_dir=cache_dir, models_dir=models_dir, renderer=None, villa=villa, python=python,
+        overwrite=True, dry_run=dry_run, deterministic=False, render_threads=1, max_render_gb=64.0,
+        on_degenerate="warn", resample_from_um=resample_from_um, output_3d=False, amp=None, roi=None,
+        normal="auto", umbilicus=None, primary=None, no_render_cache=False,
+    )
+    sdk = _build_sdk(None, models_dir, cache_dir, device, villa)
+    selected = [get_profile(item) for item in profile] if profile else list_profiles()
+    report = _guard(lambda: run_battery(
+        sdk, surface_volume, voxel_um, selected, out, ctx, centres=_int_list(centres), steps=_int_list(steps),
+        thresholds=_float_list(thresholds), resample_from_um=resample_from_um, thumb_px=thumb_px, say=typer.echo))
+    if dry_run:
+        typer.echo(json.dumps(jsonable(report), indent=2, sort_keys=True))
+
+
 if __name__ == "__main__":
     app()
