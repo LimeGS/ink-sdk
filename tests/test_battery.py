@@ -22,9 +22,18 @@ def test_plan_skips_profiles_the_scale_does_not_allow():
     assert len(cells) == len(ran) * 3 * 2
 
 
-def test_plan_without_resample_runs_nothing_at_8_64():
+def test_plan_without_resample_runs_only_native_8_64_profiles():
     cells, skipped = plan_battery(65, 8.64, list_profiles(), (0,), (1,), resample_from_um=None)
-    assert cells == [] and len(skipped) == len(list_profiles())
+    # Reader V3's card declares 8.64 um scans native; every other profile needs a resample or is skipped.
+    assert {c.profile_id for c in cells} == {"ink_9um@reader-v3"}
+    assert len(skipped) == len(list_profiles()) - 1
+
+
+def test_reader_v3_profile_matches_its_checkpoint_config():
+    from ink_sdk.registry import get_profile
+    p = get_profile("ink_9um@reader-v3")
+    assert p.adapter == "ink9um" and p.input.depth == 17 and p.input.tile == 384
+    assert p.checkpoint.sha256.startswith("ea405417") and p.checkpoint.bytes == 138379659
 
 
 def test_png_is_valid():

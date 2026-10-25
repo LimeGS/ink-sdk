@@ -1,0 +1,42 @@
+schema = "ink-sdk.profile.v1"
+id = "ink_9um@reader-v3"
+adapter = "ink9um"
+family = "surface-volume-2d"
+
+[source]
+repo = "domenicor046/reader-v3"
+revision = "aee1d64bced4eb35546348f3d276b9e2a0b99c46"
+upstream = "ScrollPrize/villa"
+upstream_revision = "3ea17f54a9b3d5fd1aaf73e1d2c8386dbaa9f30e"
+url = "https://huggingface.co/domenicor046/reader-v3"
+license = "MIT"
+
+[checkpoint]
+path = "reader-v3/reader-v3.pth"
+upstream_path = "reader-v3.pth"
+sha256 = "ea405417450abd8ace1b8ff79ebce3adb646c5e48ab95da46844d77efe984d8a"
+bytes = 138379659
+
+[input]
+kind = "surface-volume"
+family = "surface-volume-2d"
+# The model card names "the native 9.36 um and 8.64 um scans", so the tolerance covers 8.64 natively
+# (8.61-10.11 um). Reader v2 keeps 9.6 +/- 0.5 and still needs --resample-from-um at 8.64.
+scale_um = 9.362
+scale_tolerance_um = 0.75
+depth = 17
+normalization = "from-checkpoint"
+# Checkpoint config: patch_size [17, 384, 384] (v2 continued on 256 px, then 384 px tiles).
+tile = 384
+overlap = 0.5
+
+[execution]
+direction = "both"
+blend = "hann"
+batch = 1
+amp = "bf16"
+
+[output]
+primary = "forward"
+no_ink_floor = 0.0
+floor_provenance = "not-declared"

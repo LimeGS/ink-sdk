@@ -155,7 +155,11 @@ def run_battery(
                        p99=rec.get("maps", {}).get(res.primary, {}).get("statistics", {}).get("p99"),
                        reverse_summary=rec.get("reverse_summary"))
         except Exception as exc:  # one failed cell must not stop the battery
-            row.update(ok=False, error=f"{type(exc).__name__}: {exc}"[:500])
+            # Keep the end: a traceback's cause and the SDK's hint are on its last lines.
+            message = f"{type(exc).__name__}: {exc}"
+            if len(message) > 2000:
+                message = message[:300] + " [...] " + message[-1700:]
+            row.update(ok=False, error=message)
         results.append(row)
 
     report = {"schema": "ink-sdk.battery.v1", "surface_volume": str(surface_volume), "pixel_um": pixel_um,
@@ -242,7 +246,7 @@ def to_html(report: dict, out_dir: Path) -> str:
     ims = report.get("images", {})
     rows = "".join(
         f"<tr><td>{html.escape(r['profile'])}</td><td>{r['centre']:+d}</td><td>{r['step']}</td>"
-        f"<td>{'ok' if r.get('ok') else 'FAILED'}</td><td>{html.escape(str(r.get('liveness') or r.get('error', '')))[:160]}</td>"
+        f"<td>{'ok' if r.get('ok') else 'FAILED'}</td><td>{html.escape(str(r.get('liveness') or r.get('error', ''))[-200:])}</td>"
         f"<td>{_p99(r)}</td></tr>" for r in report["cells"])
     skipped = "".join(f"<li>{html.escape(s['profile'])}{_where(s)}: "
                       f"{html.escape(s['reason'])}</li>" for s in report["skipped"])
