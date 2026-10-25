@@ -42,3 +42,13 @@ def test_png_is_valid():
     ihdr = data[8 + 8: 8 + 8 + 13]
     assert int.from_bytes(ihdr[:4], "big") == 4 and int.from_bytes(ihdr[4:8], "big") == 3
     assert zlib.crc32(data[12:12 + 17]) & 0xFFFFFFFF == int.from_bytes(data[29:33], "big")
+
+
+def test_plan_pools_depth_at_source_scale():
+    # 2.4 um source pooled 4x for the 9 um models: the window must be depth x 4 source layers.
+    cells, skipped = plan_battery(65, 2.399, list_profiles(), (0,), (1,), resample_from_um=None)
+    by = {c.profile_id: c for c in cells}
+    assert len(by["hecate@9.6um"].layers) == 16 * 4          # 64 of 65 layers
+    assert len(by["hecate@2.4um"].layers) == 64
+    assert not any(p.startswith("ink_9um") for p in by)        # 17 x 4 = 68 > 65
+    assert any("17 x pool 4" in s["reason"] for s in skipped)

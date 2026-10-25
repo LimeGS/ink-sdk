@@ -87,16 +87,22 @@ def plan_battery(
     cells, skipped = [], []
     for p in profiles:
         try:
-            plan_scale(pixel_um, p, resample_from_um=resample_from_um if p.adapter == "ink9um" else None)
+            sp = plan_scale(pixel_um, p, resample_from_um=resample_from_um if p.adapter == "ink9um" else None)
         except Exception as exc:  # incompatible scale: report, do not run
             skipped.append({"profile": p.id, "reason": str(exc)})
             continue
+        # The window is cut at the SOURCE scale. When the plan pools Z by f, the model's
+        # depth needs depth * f source layers, or it receives depth / f layers after pooling.
+        fz = int(sp.factors_zyx[0]) if sp.mode == "pool" else 1
+        depth = int(p.input.depth) * fz
         for s in steps:
             for c in centres:
-                idx = window(n_layers, int(p.input.depth), int(c), int(s))
+                idx = window(n_layers, depth, int(c), int(s))
                 if idx is None:
                     skipped.append({"profile": p.id, "centre": c, "step": s,
-                                    "reason": f"window needs layers outside 0..{n_layers - 1}; render more slices"})
+                                    "reason": f"needs {depth} source layers"
+                                              + (f" ({p.input.depth} x pool {fz})" if fz > 1 else "")
+                                              + f", outside 0..{n_layers - 1}; render more slices"})
                     continue
                 cells.append(Cell(p.id, int(c), int(s), tuple(idx)))
     return cells, skipped
