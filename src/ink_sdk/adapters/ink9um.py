@@ -93,6 +93,12 @@ class Ink9umAdapter(BaseAdapter):
         self, prepared: PreparedInput, profile: ModelProfile, ctx: RunContext
     ) -> RawOutput:
         started = time.time()
+        layers = int(prepared.array.shape[0])
+        if layers < int(profile.input.depth):
+            # Upstream infer does not refuse a short stack; it would run on too few layers.
+            raise InkSDKError(
+                f"{profile.id} needs {profile.input.depth} layers, the prepared volume has {layers}"
+            )
         models_dir = ctx.models_dir or Path(
             os.environ.get("INK_SDK_MODELS", Path.home() / ".cache" / "ink-sdk" / "models")
         )
