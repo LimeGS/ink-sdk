@@ -48,6 +48,29 @@ ink-sdk infer \
 `ink-sdk fetch` is opt-in: inference never downloads weights. `ink-sdk doctor` marks each checkpoint
 `verified`, `missing` or `present-but-unverified`.
 
+## Use from Python
+
+The CLI is a thin layer over `ink_sdk.InkSDK`; everything it does is available from Python.
+
+```python
+from pathlib import Path
+from ink_sdk import InkSDK
+
+sdk = InkSDK(villa=Path("~/villa").expanduser())          # the villa checkout the 9 um profiles need
+profile = "ink_9um@reader-v3"
+segment = sdk.segment(profile=profile, surface_volume=Path("segment/surface_volume.zarr"), voxel_um=9.366)
+print(sdk.inspect(segment, profile))                      # scale and run plan, no weights loaded
+
+result = sdk.infer(segment, profile, out_dir=Path("out"),
+                   python="/path/to/villa/ink-detection/.venv/bin/python")   # the env with `vesuvius` installed
+for name, m in result.maps.items():                       # "forward", "reverse", "mean" for the 9 um profiles
+    print(name, m.shape, m.pixel_um)                      # m.array is the probability map (numpy)
+print(result.primary, result.receipt_path)
+```
+
+`sdk.models()` lists the profiles, `sdk.render(...)` renders a `tifxyz` mesh from a local CT, and `sdk.doctor()`
+runs the same checks as `ink-sdk doctor`.
+
 ## Models
 
 | Profile | Scale | Depth | Output | Notes |
