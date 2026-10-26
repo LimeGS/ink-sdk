@@ -24,9 +24,10 @@ def test_plan_skips_profiles_the_scale_does_not_allow():
 
 def test_plan_without_resample_runs_only_native_8_64_profiles():
     cells, skipped = plan_battery(65, 8.64, list_profiles(), (0,), (1,), resample_from_um=None)
-    # Reader V3's card declares 8.64 um scans native; every other profile needs a resample or is skipped.
-    assert {c.profile_id for c in cells} == {"ink_9um@reader-v3"}
-    assert len(skipped) == len(list_profiles()) - 1
+    # Reader V3 and dense_native are pinned at 9.362 +- 0.75 um, so 8.64 um is native to both;
+    # every other profile needs a resample or is skipped.
+    assert {c.profile_id for c in cells} == {"ink_9um@reader-v3", "ink_9um@dense-native-step016000"}
+    assert len(skipped) == len(list_profiles()) - 2
 
 
 def test_reader_v3_profile_matches_its_checkpoint_config():

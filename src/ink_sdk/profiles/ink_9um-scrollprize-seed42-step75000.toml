@@ -1,0 +1,39 @@
+schema = "ink-sdk.profile.v1"
+id = "ink_9um@scrollprize-seed42-step75000"
+adapter = "ink9um"
+family = "surface-volume-2d"
+
+[source]
+repo = "scrollprize/ink_9um"
+revision = "7109667e2607db1b90c37c8b09cb876ea7fe7bb1"
+upstream = "ScrollPrize/villa"
+upstream_revision = "3ea17f54a9b3d5fd1aaf73e1d2c8386dbaa9f30e"
+url = "https://huggingface.co/scrollprize/ink_9um"
+license = "MIT"
+
+[checkpoint]
+path = "ink_9um/hybrid_3d2d-seed42/step-075000.pth"
+upstream_path = "hybrid_3d2d-seed42/step-075000.pth"
+sha256 = "e635558ae6a1a807a7e5ec1e83adfd45bc3c0ac53883ea43f1d4e085d62a9cab"
+bytes = 138360039
+
+[input]
+kind = "surface-volume"
+family = "surface-volume-2d"
+scale_um = 9.6
+scale_tolerance_um = 0.5
+depth = 17
+normalization = "from-checkpoint"
+tile = 128
+overlap = 0.5
+
+[execution]
+direction = "both"
+blend = "hann"
+batch = 1
+amp = "bf16"
+
+[output]
+primary = "forward"
+no_ink_floor = 0.0
+floor_provenance = "not-declared"

@@ -10,7 +10,9 @@ from ink_sdk.registry import get_profile, list_profiles
 def test_builtin_profiles_are_exact():
     ids = {p.id for p in list_profiles()}
     assert ids == {
+        "ink_9um@scrollprize-seed42-step75000",
         "ink_9um@scrollprize-seed43-step75000",
+        "ink_9um@dense-native-step016000",
         "ink_9um@reader-v2-step040000",
         "ink_9um@reader-v3",
         "canonical_2um@r152-3ddec-v2-l5-epoch13",
@@ -20,6 +22,11 @@ def test_builtin_profiles_are_exact():
     assert get_profile("hecate@9.6um").input.depth == 16
     assert get_profile("canonical_2um@r152-3ddec-v2-l5-epoch13").input.depth == 62
     assert get_profile("ink_9um@scrollprize-seed43-step75000").checkpoint.sha256.startswith("2aeaa85a")
+    assert get_profile("ink_9um@scrollprize-seed42-step75000").checkpoint.sha256.startswith("e635558a")
+    dense = get_profile("ink_9um@dense-native-step016000")
+    assert dense.checkpoint.rebuild is not None and dense.checkpoint.rebuild.step == 16000
+    assert dense.checkpoint.rebuild.weights.sha256.startswith("d3d95dc4")
+    assert dense.input.scale_um == 9.362 and dense.input.depth == 17
 
 
 def test_profile_can_be_loaded_from_a_path(tmp_path):

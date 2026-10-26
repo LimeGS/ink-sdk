@@ -27,15 +27,18 @@ provenance of the inference code is explicit.
 
 ## Model checkpoints
 
-The five `profiles/*.toml` files pin checkpoint repository revisions, paths,
+The `profiles/*.toml` files pin checkpoint repository revisions, paths,
 byte sizes and SHA-256 digests. The checkpoint repositories' model cards and
 their own licenses govern the weights. `ink-sdk fetch` only downloads a
 checkpoint when explicitly invoked; inference never downloads weights.
 
 | profile | checkpoint repository | revision |
 |---|---|---|
+| `ink_9um@scrollprize-seed42-step75000` | `scrollprize/ink_9um` | `7109667e2607db1b90c37c8b09cb876ea7fe7bb1` |
 | `ink_9um@scrollprize-seed43-step75000` | `scrollprize/ink_9um` | `7109667e2607db1b90c37c8b09cb876ea7fe7bb1` |
 | `ink_9um@reader-v2-step040000` | `domenicor046/reader-v2` | `72633d8aa6d40e9e737ccea4c9928fbc624dab45` |
+| `ink_9um@reader-v3` | `domenicor046/reader-v3` | `aee1d64bced4eb35546348f3d276b9e2a0b99c46` |
+| `ink_9um@dense-native-step016000` | `Nieuwlaar/ink9um-dense-native` (MIT; rebuilt locally) | `b894a0493ab2291cc8dc3247020c0d7cb0967a58` |
 | `canonical_2um@r152-3ddec-v2-l5-epoch13` | `scrollprize/ink_canonical_2um` | `075855bc69317ef6febf39a0d9d687b27d2b7c29` |
 | `hecate@2.4um` | `scrollprize/hecate` | `9cb86e500e944b11a06a7020403cde5dffb5bcb2` |
 | `hecate@9.6um` | `scrollprize/hecate` | `9cb86e500e944b11a06a7020403cde5dffb5bcb2` |
@@ -50,4 +53,4 @@ Obtain it from its upstream release, comply with its license, and point
 ## Python dependencies
 
 The runtime dependencies (`numpy`, `pydantic`, `typer`, `zarr`, `tifffile`,
-and optionally `scipy`, `torch`, `huggingface_hub`) keep their own licenses.
+and optionally `scipy`, `torch`, `huggingface_hub`, `safetensors`) keep their own licenses.
