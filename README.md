@@ -6,11 +6,11 @@ Hecate can also write a 3D zarr.
 
 **Inference only.** No training, fine-tuning, OCR or scientific evaluation.
 
-![ink-sdk on PHerc1447 w058](docs/img/sdk_w058.png)
+![ink-sdk on PHerc0841 w00](docs/img/sdk_0841_w00.png)
 
-*One real run on public data (PHerc1447 w058; the human ink label is shown for reference only). The same
-9 µm model sees ink in one depth order and is blind in the other, and both maps pass the liveness gate, so
-the depth direction matters.*
+*One real run on public data none of the 9 µm models was trained on (PHerc0841 w00, Reader V3; the official ink
+label is shown for reference only, on the 1024 px crop with the most labelled ink). The same model sees the letters
+in one depth order and is blind in the other, and both maps pass the liveness gate, so the depth direction matters.*
 
 ## Quick start
 
