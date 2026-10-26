@@ -52,3 +52,25 @@ def test_plan_pools_depth_at_source_scale():
     assert len(by["hecate@2.4um"].layers) == 64
     assert not any(p.startswith("ink_9um") for p in by)        # 17 x 4 = 68 > 65
     assert any("17 x pool 4" in s["reason"] for s in skipped)
+
+
+def test_battery_page_renders_summary_failures_and_escapes(tmp_path):
+    from ink_sdk.battery import to_html
+
+    report = {
+        "surface_volume": "/data/seg<1>/sv.zarr", "pixel_um": 9.366, "layers": 28, "centres": [0], "steps": [1],
+        "runtime_seconds": 12.0, "images": {}, "non_claims": ["not OCR"],
+        "cells": [
+            {"profile": "a@x", "centre": 0, "step": 1, "ok": True, "liveness": "ALIVE", "p99": 0.7},
+            {"profile": "b@y", "centre": 0, "step": 1, "ok": False, "error": "Boom <bad>"},
+        ],
+        "skipped": [{"profile": "c@z", "reason": "scale"}],
+        "ensemble": {"reading_side": "reverse", "blind_side": "forward", "steps": {"1": {
+            "profiles": ["a@x", "b@y"], "centres": [0],
+            "images": {"c+0": "ensemble/step1/r.png", "c+0_blind": "ensemble/step1/b.png"}}}},
+    }
+    page = to_html(report, tmp_path)
+    assert "seg&lt;1&gt;" in page and "Boom &lt;bad&gt;" in page and "<bad>" not in page
+    assert "FAILED" in page and "ALIVE" in page and "not OCR" in page
+    assert 'href="#ensemble"' in page and 'src="ensemble/step1/b.png"' in page
+    assert "reading side · reverse" in page and "blind side · forward" in page

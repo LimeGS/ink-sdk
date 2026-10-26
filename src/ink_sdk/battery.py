@@ -245,58 +245,183 @@ def make_images(thick: np.ndarray, results: list[dict], out_dir: Path, threshold
     return images
 
 
-def _p99(r: dict) -> str:
-    return "" if r.get("p99") is None else "%.3f" % r["p99"]
+_CSS = """
+:root{--bg:#14110d;--panel:#1d1915;--line:#352d25;--ink:#efe6d8;--mute:#a59a8b;--accent:#f0a830;
+--ok:#7fc48a;--warn:#e7b04a;--bad:#e8735f;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:28px clamp(16px,4vw,48px) 18px;border-bottom:1px solid var(--line)}
+h1{font:600 30px/1.2 Georgia,"Times New Roman",serif;margin:0 0 4px;letter-spacing:.2px}
+h1 span{color:var(--accent)}
+.src{font:13px var(--mono);color:var(--mute);word-break:break-all}
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 14px;min-width:96px}
+.stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}.stat small{color:var(--mute);font-size:12px}
+nav{position:sticky;top:0;z-index:5;background:rgba(20,17,13,.94);backdrop-filter:blur(6px);
+border-bottom:1px solid var(--line);padding:0 clamp(16px,4vw,48px);display:flex;gap:4px;overflow-x:auto}
+nav a{color:var(--mute);text-decoration:none;padding:11px 12px;font-size:14px;white-space:nowrap;border-bottom:2px solid transparent}
+nav a:hover{color:var(--ink);border-color:var(--accent)}
+main{padding:8px clamp(16px,4vw,48px) 48px;max-width:1500px}
+section{padding-top:22px}h2{font:600 21px Georgia,serif;margin:10px 0 6px}
+h3{font-size:15px;margin:18px 0 8px;color:var(--ink)}
+.note{color:var(--mute);font-size:13.5px;max-width:880px;margin:0 0 12px}
+.profiles{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.chip{font:12px var(--mono);background:#2a231c;border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+.pairs{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,560px),1fr));gap:16px}
+.pair{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px 12px}
+.pair h4{margin:0 0 8px;font-size:14px;font-weight:600}.pair h4 span{color:var(--mute);font-weight:400}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+figure{margin:0}figcaption{font-size:12px;color:var(--mute);margin-bottom:4px}
+figcaption.read{color:var(--accent)}
+img{display:block;max-width:100%;height:auto;border-radius:6px;background:#000}
+a.zoom{display:block;cursor:zoom-in}
+.frame{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+.stab{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:16px;max-width:1100px}
+.mosaic{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:stretch}
+.cols{grid-column:2;display:flex}.cols span{flex:1;text-align:center;font-size:12px;color:var(--mute)}
+.rows{display:flex;flex-direction:column}.rows span{flex:1;display:flex;align-items:center;justify-content:flex-end;
+text-align:right;font:12px var(--mono);color:var(--mute);max-width:230px;overflow-wrap:anywhere}
+.mosaic img{width:100%}
+details{margin:8px 0}summary{cursor:pointer;font-weight:600;padding:6px 0}summary span{color:var(--mute);font-weight:400}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:left;color:var(--mute);font-weight:500;font-size:12.5px;border-bottom:1px solid var(--line);padding:6px 10px}
+td{border-bottom:1px solid #2a231c;padding:6px 10px;vertical-align:middle}
+td.num{font-variant-numeric:tabular-nums;font-family:var(--mono)}td.p{font:13px var(--mono)}
+.tw{overflow-x:auto}.badge{font:600 11.5px var(--mono);padding:2px 8px;border-radius:999px;border:1px solid}
+.b-ok{color:var(--ok);border-color:#3c5e41}.b-warn{color:var(--warn);border-color:#6a5326}.b-bad{color:var(--bad);border-color:#6d3a31}
+.bar{display:inline-block;width:70px;height:6px;background:#2a231c;border-radius:3px;margin-left:8px;vertical-align:middle}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.err{font:12px var(--mono);color:var(--bad);max-width:520px;word-break:break-word}
+ul.skip{padding-left:18px;color:var(--mute)}ul.skip b{color:var(--ink);font-weight:500}
+footer{border-top:1px solid var(--line);padding:18px clamp(16px,4vw,48px);color:var(--mute);font-size:13px}
+@media(max-width:640px){.two{grid-template-columns:1fr}.mosaic{grid-template-columns:1fr}.rows,.cols{display:none}}
+"""
 
 
-def _where(s: dict) -> str:
-    return "" if "centre" not in s else " centre %+d step %d" % (s["centre"], s["step"])
+def _esc(x: Any) -> str:
+    return html.escape(str(x))
+
+
+def _b64(path: Path) -> str | None:
+    return f"data:image/png;base64,{base64.b64encode(path.read_bytes()).decode()}" if path.is_file() else None
+
+
+def _badge(row: dict) -> str:
+    if not row.get("ok"):
+        return '<span class="badge b-bad">FAILED</span>'
+    v = str(row.get("liveness") or "-")
+    cls = "b-ok" if v == "ALIVE" else "b-warn"
+    return f'<span class="badge {cls}">{_esc(v)}</span>'
+
+
+def _p99_cell(row: dict) -> str:
+    p = row.get("p99")
+    if p is None:
+        return '<td class="num"></td>'
+    w = max(0.0, min(1.0, float(p))) * 100
+    return f'<td class="num">{float(p):.3f}<span class="bar"><i style="width:{w:.0f}%"></i></span></td>'
 
 
 def _ensemble_html(ens: dict | None) -> str:
     if not ens:
         return ""
-    out = [f"<h2>Ensemble (z-score, reading side = {html.escape(ens['reading_side'])})</h2>"
-           "<p class=\"k\">Mean of the per-profile z-scores; statistics and one stretch per step from the reading "
-           "side, applied to the blind side too. After Erwin Nieuwlaar's PHerc0343 recipe; his tile-phase merge is "
-           "not included.</p>"]
+    read, blind = _esc(ens["reading_side"]), _esc(ens.get("blind_side", ""))
+    out = ['<section id="ensemble"><h2>Ensemble</h2>',
+           f'<p class="note">Mean of the per-profile z-scores. Statistics and one contrast stretch per depth width come '
+           f'from the reading side (<b>{read}</b>) and are applied to the blind side ({blind}) as well, so the two '
+           "can be compared directly. After Erwin Nieuwlaar's PHerc0343 recipe; his tile-phase merge is not included. "
+           "Click an image for full size.</p>"]
     for step, e in ens.get("steps", {}).items():
-        out.append(f"<h3>step {html.escape(step)}: {html.escape(', '.join(e.get('profiles', [])))}</h3>")
+        chips = "".join(f'<span class="chip">{_esc(p)}</span>' for p in e.get("profiles", []))
+        out.append(f'<h3>Depth width: step {_esc(step)}</h3><div class="profiles">{chips}</div>')
         if e.get("note"):
-            out.append(f"<p class=\"k\">{html.escape(e['note'])}</p>")
+            out.append(f'<p class="note">{_esc(e["note"])}</p>')
+            continue
+        out.append('<div class="pairs">')
         for c in e.get("centres", []):
-            pair = [e["images"].get(f"c{c:+d}"), e["images"].get(f"c{c:+d}_blind")]
-            cells = "".join(f'<td><img src="{html.escape(p)}" alt="{html.escape(p)}"></td>' for p in pair if p)
-            out.append(f"<p class=\"k\">centre {c:+d}: reading | blind</p><table><tr>{cells}</tr></table>")
+            figs = []
+            for key, label, cls in ((f"c{c:+d}", f"reading side · {read}", "read"),
+                                    (f"c{c:+d}_blind", f"blind side · {blind}", "")):
+                src = e.get("images", {}).get(key)
+                if src:
+                    figs.append(f'<figure><figcaption class="{cls}">{label}</figcaption>'
+                                f'<a class="zoom" href="{_esc(src)}" target="_blank" rel="noopener">'
+                                f'<img loading="lazy" src="{_esc(src)}" alt="ensemble {_esc(key)}"></a></figure>')
+            out.append(f'<div class="pair"><h4>centre {c:+d} <span>layers from the middle</span></h4>'
+                       f'<div class="two">{"".join(figs)}</div></div>')
+        out.append("</div>")
+    out.append("</section>")
+    return "".join(out)
+
+
+def _mosaics_html(ims: dict, out_dir: Path) -> str:
+    rows, cols = ims.get("rows", []), ims.get("cols", [])
+    keys = [k for k in ims if k.startswith("mosaic_")]
+    if not keys:
+        return ""
+    out = ['<section id="mosaics"><h2>Mosaics</h2><p class="note">One tile per cell: rows are profile × depth width, '
+           "columns are depth centres. Orange marks map ≥ threshold, over the CT layer at that centre or over black."
+           "</p>"]
+    for i, k in enumerate(keys):
+        v, src = ims[k], _b64(out_dir / k)
+        if not src:
+            continue
+        lab_r = "".join(f"<span>{_esc(r)}</span>" for r in rows)
+        lab_c = "".join(f"<span>{_esc(c)}</span>" for c in cols)
+        out.append(f'<details{" open" if i == 0 else ""}><summary>threshold {v["threshold"]:g} '
+                   f'<span>over {_esc(v["background"])}</span></summary><div class="frame mosaic">'
+                   f'<div class="cols">{lab_c}</div><div class="rows">{lab_r}</div>'
+                   f'<img src="{src}" alt="{_esc(k)}"></div></details>')
+    out.append("</section>")
     return "".join(out)
 
 
 def to_html(report: dict, out_dir: Path) -> str:
-    def img(name: str) -> str:
-        p = out_dir / name
-        return (f'<img src="data:image/png;base64,{base64.b64encode(p.read_bytes()).decode()}" alt="{html.escape(name)}">'
-                if p.is_file() else "")
     ims = report.get("images", {})
-    rows = "".join(
-        f"<tr><td>{html.escape(r['profile'])}</td><td>{r['centre']:+d}</td><td>{r['step']}</td>"
-        f"<td>{'ok' if r.get('ok') else 'FAILED'}</td><td>{html.escape(str(r.get('liveness') or r.get('error', ''))[-200:])}</td>"
-        f"<td>{_p99(r)}</td></tr>" for r in report["cells"])
-    skipped = "".join(f"<li>{html.escape(s['profile'])}{_where(s)}: "
-                      f"{html.escape(s['reason'])}</li>" for s in report["skipped"])
-    mos = "".join(f"<h3>threshold {v['threshold']:g}, over {v['background']}</h3>{img(k)}"
-                  for k, v in ims.items() if k.startswith("mosaic_"))
-    stab = "".join(f"<h3>threshold {v['threshold']:g} ({v['cells']} cells)</h3>{img(k)}"
-                   for k, v in ims.items() if k.startswith("stability_"))
-    return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ink-sdk battery</title><style>body{{font:14px/1.5 system-ui,sans-serif;background:#17140f;color:#eee5d8;margin:0;padding:20px}}
-h1{{font:600 26px Georgia,serif}} img{{max-width:100%;border:1px solid #3a3229;margin:6px 0}} table{{border-collapse:collapse}}
-td,th{{border-bottom:1px solid #3a3229;padding:4px 10px;text-align:left}} .k{{color:#a99f91}}</style></head><body>
-<h1>ink-sdk battery</h1><p class="k">{html.escape(report['surface_volume'])} · {report['layers']} layers · {report['pixel_um']} um ·
-centres {report['centres']} · steps {report['steps']} · {report['runtime_seconds']} s</p>
-<p class="k">Rows: {html.escape(', '.join(ims.get('rows', [])))}. Columns: {html.escape(', '.join(ims.get('cols', [])))}.
-Orange = map ≥ threshold. Every cell is shown; none is selected.</p>
-<h2>What holds across settings</h2>{stab}<h2>Mosaics</h2>{mos}
-{_ensemble_html(report.get("ensemble"))}
-<h2>Skipped</h2><ul>{skipped or '<li>none</li>'}</ul>
-<h2>Cells</h2><table><tr><th>profile</th><th>centre</th><th>step</th><th></th><th>liveness / error</th><th>p99</th></tr>{rows}</table>
-</body></html>"""
+    cells = report["cells"]
+    n_ok = sum(1 for r in cells if r.get("ok"))
+    n_alive = sum(1 for r in cells if r.get("ok") and r.get("liveness") == "ALIVE")
+    profiles = sorted({r["profile"] for r in cells})
+    name = Path(str(report["surface_volume"]).rstrip("/")).name
+    stats = [(len(cells), "cells"), (n_ok, "ran"), (n_alive, "ALIVE"), (len(cells) - n_ok, "failed"),
+             (len(report["skipped"]), "skipped"), (len(profiles), "profiles"),
+             (f'{report["pixel_um"]:g} µm', f'{report["layers"]} layers'),
+             (f'{report["runtime_seconds"]:g} s', "runtime")]
+    stat_html = "".join(f'<div class="stat"><b>{_esc(v)}</b><small>{_esc(k)}</small></div>' for v, k in stats)
+
+    stab = [f'<figure class="frame"><figcaption>threshold {v["threshold"]:g} · {v["cells"]} cells</figcaption>'
+            f'<img src="{_b64(out_dir / k)}" alt="{_esc(k)}"></figure>'
+            for k, v in ims.items() if k.startswith("stability_") and (out_dir / k).is_file()]
+    stab_html = ('<section id="stability"><h2>What holds across settings</h2><p class="note">Fraction of all cells '
+                 "(every profile, centre and width) in which the map is at or above the threshold. Bright = holds "
+                 "whatever the setting.</p>" + f'<div class="stab">{"".join(stab)}</div></section>') if stab else ""
+
+    trs = []
+    for r in cells:
+        detail = "" if r.get("ok") else f'<div class="err">{_esc(str(r.get("error", ""))[-300:])}</div>'
+        trs.append(f'<tr><td class="p">{_esc(r["profile"])}</td><td class="num">{r["centre"]:+d}</td>'
+                   f'<td class="num">{r["step"]}</td><td>{_badge(r)}{detail}</td>{_p99_cell(r)}</tr>')
+    skipped = "".join(f"<li><b>{_esc(s['profile'])}</b>{_esc(_where(s))}: {_esc(s['reason'])}</li>"
+                      for s in report["skipped"])
+    nav = [("ensemble", "Ensemble", report.get("ensemble")), ("stability", "Across settings", stab),
+           ("mosaics", "Mosaics", any(k.startswith("mosaic_") for k in ims)), ("cells", "Cells", True),
+           ("skipped", "Skipped", True)]
+    nav_html = "".join(f'<a href="#{i}">{t}</a>' for i, t, on in nav if on)
+    claims = "".join(f"<li>{_esc(c)}</li>" for c in report.get("non_claims", []))
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>ink-sdk battery · {_esc(name)}</title>
+<style>{_CSS}</style></head><body>
+<header><h1>ink-sdk <span>battery</span></h1><div class="src">{_esc(report["surface_volume"])}</div>
+<div class="stats">{stat_html}</div>
+<p class="note" style="margin-top:12px">Every profile × depth centre {_esc(report["centres"])} × width (step)
+{_esc(report["steps"])}. Every cell is shown; none is selected.</p></header>
+<nav>{nav_html}</nav><main>
+{_ensemble_html(report.get("ensemble"))}{stab_html}{_mosaics_html(ims, out_dir)}
+<section id="cells"><h2>Cells</h2><div class="tw"><table><tr><th>profile</th><th>centre</th><th>step</th>
+<th>liveness</th><th>p99 of primary map</th></tr>{"".join(trs)}</table></div></section>
+<section id="skipped"><h2>Skipped</h2><ul class="skip">{skipped or "<li>none</li>"}</ul></section>
+</main><footer><ul style="margin:0;padding-left:18px">{claims}</ul></footer></body></html>"""
+
+
+def _where(s: dict) -> str:
+    return "" if "centre" not in s else " centre %+d step %d" % (s["centre"], s["step"])
