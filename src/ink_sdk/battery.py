@@ -11,6 +11,8 @@ Outputs (``OUT``):
   mosaic_<bg>_t<thr>.png                 rows = profile x step, columns = centre; bg = ct | black
   stability_t<thr>.png                   fraction of all cells where the map is >= thr (what holds across settings)
   index.html, BATTERY.json               everything above, plus every skipped profile or failed cell and why
+  ensemble/step<s>/                      with ``ensemble``: z-score ensemble per centre, reading and blind side
+                                         (see ensemble.py; after Erwin Nieuwlaar's PHerc0343 recipe)
 
 The battery does not pick a best cell. It shows all of them, and the stability map shows what survives the
 choice of settings.
@@ -122,6 +124,7 @@ def run_battery(
     thresholds: Sequence[float] = (0.5, 0.7),
     resample_from_um: float | None = None,
     thumb_px: int = 360,
+    ensemble: str | None = None,
     say: Callable[[str], None] = print,
 ) -> dict:
     out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
@@ -133,6 +136,8 @@ def run_battery(
     cells, skipped = plan_battery(n, pixel_um, profiles, centres, steps, resample_from_um)
     say(f"battery: {n} layers, {len(cells)} cells, {len(skipped)} skipped")
     started = time.time()
+    if ensemble is not None and ensemble not in ("forward", "reverse"):
+        raise InkSDKError(f"--ensemble must be forward or reverse (the reading side), not {ensemble!r}")
     if ctx.dry_run:
         return {"layers": n, "cells": [dataclasses.asdict(c) for c in cells], "skipped": skipped}
 
@@ -175,6 +180,10 @@ def run_battery(
               "non_claims": ["A probability map is not OCR and does not accept ink, text or letters.",
                              "The battery shows every cell; it does not select a best one."]}
     report["images"] = make_images(thick, results, out_dir, thresholds, thumb_px)
+    if ensemble:
+        from .ensemble import ensemble_battery
+        say(f"battery: ensemble, reading side {ensemble}")
+        report["ensemble"] = ensemble_battery(thick, results, {p.id: p.adapter for p in profiles}, out_dir, ensemble)
     write_json(out_dir / "BATTERY.json", report)
     (out_dir / "index.html").write_text(to_html(report, out_dir), encoding="utf-8")
     say(f"battery: {out_dir / 'index.html'}")
@@ -244,6 +253,24 @@ def _where(s: dict) -> str:
     return "" if "centre" not in s else " centre %+d step %d" % (s["centre"], s["step"])
 
 
+def _ensemble_html(ens: dict | None) -> str:
+    if not ens:
+        return ""
+    out = [f"<h2>Ensemble (z-score, reading side = {html.escape(ens['reading_side'])})</h2>"
+           "<p class=\"k\">Mean of the per-profile z-scores; statistics and one stretch per step from the reading "
+           "side, applied to the blind side too. After Erwin Nieuwlaar's PHerc0343 recipe; his tile-phase merge is "
+           "not included.</p>"]
+    for step, e in ens.get("steps", {}).items():
+        out.append(f"<h3>step {html.escape(step)}: {html.escape(', '.join(e.get('profiles', [])))}</h3>")
+        if e.get("note"):
+            out.append(f"<p class=\"k\">{html.escape(e['note'])}</p>")
+        for c in e.get("centres", []):
+            pair = [e["images"].get(f"c{c:+d}"), e["images"].get(f"c{c:+d}_blind")]
+            cells = "".join(f'<td><img src="{html.escape(p)}" alt="{html.escape(p)}"></td>' for p in pair if p)
+            out.append(f"<p class=\"k\">centre {c:+d}: reading | blind</p><table><tr>{cells}</tr></table>")
+    return "".join(out)
+
+
 def to_html(report: dict, out_dir: Path) -> str:
     def img(name: str) -> str:
         p = out_dir / name
@@ -269,6 +296,7 @@ centres {report['centres']} · steps {report['steps']} · {report['runtime_secon
 <p class="k">Rows: {html.escape(', '.join(ims.get('rows', [])))}. Columns: {html.escape(', '.join(ims.get('cols', [])))}.
 Orange = map ≥ threshold. Every cell is shown; none is selected.</p>
 <h2>What holds across settings</h2>{stab}<h2>Mosaics</h2>{mos}
+{_ensemble_html(report.get("ensemble"))}
 <h2>Skipped</h2><ul>{skipped or '<li>none</li>'}</ul>
 <h2>Cells</h2><table><tr><th>profile</th><th>centre</th><th>step</th><th></th><th>liveness / error</th><th>p99</th></tr>{rows}</table>
 </body></html>"""
