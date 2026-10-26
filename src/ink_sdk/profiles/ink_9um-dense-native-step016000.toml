@@ -1,0 +1,57 @@
+schema = "ink-sdk.profile.v1"
+id = "ink_9um@dense-native-step016000"
+adapter = "ink9um"
+family = "surface-volume-2d"
+
+# Erwin Nieuwlaar's dense_native fine-tune of the ink_9um recipe, trained on native-resolution (9.362 um) scans.
+# Upstream publishes weights + config, not a .pth: `ink-sdk fetch` rebuilds the VILLA checkpoint with his recipe
+# (rebuild_dense_native_pth.py). The pinned sha256 below was produced with torch 2.10.0; the rebuild was checked
+# to be byte-identical across runs. It is not byte-identical to Erwin's own training checkpoint (sha256 aacf6cb8...,
+# which also holds optimizer state); he reports maps from the two agree at r >= 0.99999.
+[source]
+repo = "Nieuwlaar/ink9um-dense-native"
+revision = "b894a0493ab2291cc8dc3247020c0d7cb0967a58"
+upstream = "ScrollPrize/villa"
+upstream_revision = "3ea17f54a9b3d5fd1aaf73e1d2c8386dbaa9f30e"
+url = "https://huggingface.co/Nieuwlaar/ink9um-dense-native"
+license = "MIT"
+
+[checkpoint]
+path = "ink9um-dense-native/dense_native-016000.pth"
+sha256 = "c08d7c7640b4aa270e74ea45e7559d6248e312bca01d16a63992295b674b58c6"
+bytes = 272890911
+
+[checkpoint.rebuild]
+recipe = "villa-pth-from-safetensors"
+step = 16000
+
+[checkpoint.rebuild.weights]
+path = "weights/dense_native_016000.safetensors"
+sha256 = "d3d95dc41dcb24ed76b84b5e12ca5dae25d7fb34edf1dfbb93e0186f91e6fc6d"
+bytes = 272767904
+
+[checkpoint.rebuild.config]
+path = "training/configs/train_dense_native.json"
+sha256 = "5d8459030b36cd3980a03610c684365a7407d497173eff433efdb37f75840c86"
+bytes = 11823
+
+[input]
+kind = "surface-volume"
+family = "surface-volume-2d"
+scale_um = 9.362
+scale_tolerance_um = 0.75
+depth = 17
+normalization = "from-checkpoint"
+tile = 128
+overlap = 0.5
+
+[execution]
+direction = "both"
+blend = "hann"
+batch = 1
+amp = "bf16"
+
+[output]
+primary = "forward"
+no_ink_floor = 0.0
+floor_provenance = "not-declared"

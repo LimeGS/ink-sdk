@@ -29,11 +29,58 @@ class Source(_Strict):
     license: str
 
 
+def _hex64(value: str, field: str) -> str:
+    value = value.lower()
+    if len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
+        raise ValueError(f"{field} must be 64 lowercase hex characters")
+    return value
+
+
+class RebuildFile(_Strict):
+    path: str
+    sha256: str
+    bytes: int
+
+    @field_validator("sha256")
+    @classmethod
+    def _sha(cls, value: str) -> str:
+        return _hex64(value, "checkpoint.rebuild file sha256")
+
+    @field_validator("bytes")
+    @classmethod
+    def _bytes(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("checkpoint.rebuild file bytes must be positive")
+        return value
+
+
+class Rebuild(_Strict):
+    """A checkpoint that upstream publishes as weights + config, not as the .pth VILLA loads.
+
+    `ink-sdk fetch` downloads both pinned files and wraps them as
+    torch.save({"model": weights, "config": config, "step": step}). The result is
+    then checked against the profile's pinned sha256 like any other checkpoint.
+    """
+
+    recipe: str
+    weights: RebuildFile
+    config: RebuildFile
+    step: int
+
+    @field_validator("recipe")
+    @classmethod
+    def _recipe(cls, value: str) -> str:
+        if value != "villa-pth-from-safetensors":
+            raise ValueError("checkpoint.rebuild.recipe must be villa-pth-from-safetensors")
+        return value
+
+
 class Checkpoint(_Strict):
     path: str
     upstream_path: str | None = None
     sha256: str
     bytes: int
+    rebuild: Rebuild | None = None
 
     @field_validator("path")
     @classmethod

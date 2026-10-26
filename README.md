@@ -19,7 +19,7 @@ git clone https://github.com/LimeGS/ink-sdk.git
 cd ink-sdk
 python -m pip install -e '.[all]'
 
-ink-sdk fetch --profile hecate@2.4um    # or `ink-sdk fetch` for all five
+ink-sdk fetch --profile hecate@2.4um    # or `ink-sdk fetch` for all of them
 ink-sdk doctor
 ```
 
@@ -75,13 +75,23 @@ runs the same checks as `ink-sdk doctor`.
 
 | Profile | Scale | Depth | Output | Notes |
 |---|---:|---:|---|---|
+| `ink_9um@scrollprize-seed42-step75000` | 9.6 ± 0.5 µm | 17 | 2D | VILLA; both directions |
 | `ink_9um@scrollprize-seed43-step75000` | 9.6 ± 0.5 µm | 17 | 2D | VILLA; both directions |
 | `ink_9um@reader-v2-step040000` | 9.6 ± 0.5 µm | 17 | 2D | VILLA; both directions |
+| `ink_9um@reader-v3` | 9.362 ± 0.75 µm | 17 | 2D | VILLA; both directions |
+| `ink_9um@dense-native-step016000` | 9.362 ± 0.75 µm | 17 | 2D | VILLA; both directions; checkpoint rebuilt by `fetch` |
 | `canonical_2um@r152-3ddec-v2-l5-epoch13` | 2.399 ± 0.05 µm | 62 | 2D | forward only |
 | `hecate@2.4um` | 2.4 ± 0.048 µm | 64 | 2D / 3D | 3D with `--output-3d` |
 | `hecate@9.6um` | 9.6 ± 0.192 µm | 16 | 2D / 3D | 3D with `--output-3d` |
 
 `ink-sdk models` lists them; `ink-sdk models --json` also shows checkpoint paths and SHA-256 values.
+
+Seed 42 and dense_native are the two models Erwin Nieuwlaar added to the public set in his PHerc0343 First
+Letters recipe ([Nieuwlaar/pherc343-first-letters](https://github.com/Nieuwlaar/pherc343-first-letters)).
+dense_native ([Nieuwlaar/ink9um-dense-native](https://huggingface.co/Nieuwlaar/ink9um-dense-native), MIT) is
+published as weights plus training config, not as the `.pth` VILLA loads. `ink-sdk fetch` downloads both pinned
+files and rebuilds the checkpoint with his recipe, which needs `torch` and `safetensors`. The pinned digest was
+produced with torch 2.10; another torch version may write different bytes, and `fetch` then says so.
 
 ## What a run writes
 
@@ -292,7 +302,7 @@ unverified.
 <details>
 <summary><b>Profiles (templates)</b> — use by ID, copy and modify, custom directories</summary>
 
-The five TOMLs in `src/ink_sdk/profiles/` are the default profile templates. In an installed wheel, find the
+The TOMLs in `src/ink_sdk/profiles/` are the default profile templates. In an installed wheel, find the
 packaged copies with:
 
 ```bash
