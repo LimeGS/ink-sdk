@@ -426,6 +426,9 @@ def battery_cmd(
     cache_dir: Optional[Path] = typer.Option(None, "--cache-dir"),
     thumb_px: int = typer.Option(360, "--thumb-px", help="Width of each mosaic tile."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print the cells and the skipped profiles, run nothing."),
+    ensemble: Optional[str] = typer.Option(
+        None, "--ensemble",
+        help="Also write a z-score ensemble of the cells; the value is the reading side (forward or reverse)."),
 ) -> None:
     """Every profile x depth centre x depth width on one segment: maps, overlays, a mosaic, a stability map."""
     from .battery import run_battery
@@ -441,7 +444,8 @@ def battery_cmd(
     selected = [get_profile(item) for item in profile] if profile else list_profiles()
     report = _guard(lambda: run_battery(
         sdk, surface_volume, voxel_um, selected, out, ctx, centres=_int_list(centres), steps=_int_list(steps),
-        thresholds=_float_list(thresholds), resample_from_um=resample_from_um, thumb_px=thumb_px, say=typer.echo))
+        thresholds=_float_list(thresholds), resample_from_um=resample_from_um, thumb_px=thumb_px,
+        ensemble=ensemble, say=typer.echo))
     if dry_run:
         typer.echo(json.dumps(jsonable(report), indent=2, sort_keys=True))
 

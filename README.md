@@ -195,6 +195,37 @@ Add `--output-3d` for a 3D zarr.
 </details>
 
 <details>
+<summary><b>Battery and ensemble</b> — every profile × depth on one segment, and a z-score ensemble</summary>
+
+`ink-sdk battery` takes one thick surface volume and runs every compatible profile at several depth centres
+(`--centres`, in layers from the middle) and widths (`--steps`). Each cell is a normal `infer`, with the same
+scale checks, liveness gate and receipt. It writes mosaics, a stability map and `index.html`, and does not pick
+a best cell.
+
+```bash
+ink-sdk battery \
+  --surface-volume /data/segments/SCROLL/surface-volumes/9.362um.zarr --voxel-um 9.362 \
+  -p ink_9um@reader-v3 -p ink_9um@scrollprize-seed43-step75000 -p ink_9um@reader-v2-step040000 \
+  --centres=-4,-2,0,2,4 --steps 1 \
+  --ensemble reverse \
+  --villa "$VILLA" --out runs/battery
+```
+
+`--ensemble reverse|forward` also writes `ensemble/step<s>/`: per centre, the mean of the per-profile z-scores.
+The value names the reading side, the direction that sees ink on this segment; you choose it. Each profile's
+mean and SD are pooled over the reading side at every centre (valid pixels only, CT > 0 in every layer), and one
+p1–p99.5 stretch per step is taken from the reading-side ensemble. The blind side is shown with the reading
+side's statistics. 9 µm (VILLA) maps are first mapped to `clip((v − 64) / 128, 0, 1)` of their uint8 value, and
+every map is resized to the surface-volume grid.
+
+This follows Erwin Nieuwlaar's PHerc0343 recipe
+([`ink/scripts/ensemble_maps.py`](https://github.com/Nieuwlaar/pherc343-first-letters), MIT). Not included:
+his tile-phase merge (each map run twice with shifted tiles and the halves stitched), which is specific to his
+two-part mesh. Images are in render orientation. An ensemble image is a display, not a measurement of ink.
+
+</details>
+
+<details>
 <summary><b>Installation options</b> — extras and the external renderer</summary>
 
 `[all]` is the easiest install. Use only the extras you need:
@@ -403,6 +434,7 @@ ink-sdk doctor [--json] [--renderer PATH] [--models-dir PATH] [--villa PATH]
 ink-sdk inspect --profile ID|TOML (--surface-volume PATH | --tifxyz MESH --ct CT)
 ink-sdk render --tifxyz MESH --ct CT [--profile ID|TOML] [--out PATH] [--dry-run]
 ink-sdk infer (--surface-volume PATH | --tifxyz MESH --ct CT) --profile ID|TOML ...
+ink-sdk battery --surface-volume PATH --voxel-um UM [--profile ID ...] [--ensemble reverse|forward] ...
 ```
 
 Useful `infer` flags: `--roi`, `--primary`, `--device`, `--amp`, `--resample-from-um`, `--normal`,
