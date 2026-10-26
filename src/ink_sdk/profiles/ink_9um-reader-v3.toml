@@ -38,5 +38,6 @@ amp = "bf16"
 
 [output]
 primary = "forward"
-no_ink_floor = 0.0
-floor_provenance = "not-declared"
+# Declared by the model author (KLAVIS / domenicor046): trained with label smoothing 0.5.
+no_ink_floor = 0.5
+floor_provenance = "author"
