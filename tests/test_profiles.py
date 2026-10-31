@@ -18,6 +18,9 @@ def test_builtin_profiles_are_exact():
         "canonical_2um@r152-3ddec-v2-l5-epoch13",
         "hecate@2.4um",
         "hecate@9.6um",
+        "timesformer@gp-scroll1",
+        "timesformer@large-scroll1",
+        "timesformer@scroll5",
     }
     assert get_profile("hecate@9.6um").input.depth == 16
     assert get_profile("canonical_2um@r152-3ddec-v2-l5-epoch13").input.depth == 62
