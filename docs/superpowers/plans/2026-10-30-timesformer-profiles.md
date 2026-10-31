@@ -57,17 +57,17 @@ _build_model(profile), _checkpoint_state(path), existing RawOutput/RunContext.
 - [x] GREEN: minimum adapter/registry/optional-extra/profile changes; no shared
   sliding-window abstraction or source-registry mutation.
 - [x] Run PYTHONPATH=src python -m pytest -q. Expected: all tests pass.
-- [ ] Commit only this feature's code/tests/profiles and this plan.
+- [x] Commit only this feature's code/tests/profiles and this plan.
 
 ### Task 2: Verify real weights, document and open PR
 **Files:** README.md;THIRD_PARTY_NOTICES.md;tests/test_timesformer.py;this plan.
 **Interfaces:** consume Task1 profiles/adapter through existing API/CLI.
-- [ ] Existing CLI/dummy pipeline/scale/orientation/fetch suite remains green;
+- [x] Existing CLI/dummy pipeline/scale/orientation/fetch suite remains green;
   full SDK infer with a small model verifies files, scale, mask and receipt.
-- [ ] Real3checkpoint architecture/load/forward smoke in a separate fresh remote
+- [x] Real3checkpoint architecture/load/forward smoke in a separate fresh remote
   code root on CPU or an idle explicitly approved GPU, no downloads to inference
   caches and no replacement of the PHerc1218 runtime/artifacts.
-- [ ] Document install extra, three IDs, fetch/infer example, exact physical
+- [x] Document install extra, three IDs, fetch/infer example, exact physical
   contract/unsupported scales and experimental limitations; acknowledge sources.
 - [ ] One fresh read-only review; one Important/Critical TDD fix pass if needed;
   green full suite/build/packaged profiles verification.
@@ -83,3 +83,14 @@ _build_model(profile), _checkpoint_state(path), existing RawOutput/RunContext.
 - Hindsight list/search/capture refused localhost8888; keep a local ledger.
 - Shared interface Task1 RawOutput/profile IDs feeds Task2 API/docs/smoke; no conflict.
 - User approved inline execution without more question rounds; proceed to PR.
+
+## Verification evidence
+- Task1 RED31failed6passed, then full99passed; existing70tests stay green.
+- GP/Large/Scroll5 real weights loaded strictly on authorized GPU1 with
+  timesformer-pytorch0.4.1/torch2.6.0+cu124. A neutral26×87×101 crop from the
+  verified nativew064 render matched the separate reference runner exactly:
+  maximum probability/u16 error0 for all3models; support identical.
+- Independent smoke code/models links/core-dependency site live under
+  /ssd/draft/ink-sdk-timesformer-smoke-20261030, not the PHerc1218 runtime.
+  ReceiptSHA c7f8443cb04db1171132de71bf1654600ac97bce9390d32df0c5120a456dbd61.
+  Original runtime-sourceSHA remained unchanged. No training/TEST/accuracy claim.

@@ -3,9 +3,9 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -57,6 +57,7 @@ def pin_fixture(p, path):
 @pytest.mark.parametrize("identifier", IDS)
 def test_profile_is_usable_by_registry_scale_and_pinned_fetch(tmp_path, monkeypatch, identifier):
     import huggingface_hub
+
     from ink_sdk.fetch import fetch_profile
     from ink_sdk.prepare import plan_scale
     p = profile(identifier)
@@ -213,6 +214,7 @@ def test_archive_training_objects_are_inert_and_unknown_globals_are_rejected(tmp
                                    {"bias": torch.tensor(0.), "extra": torch.tensor(1.)}])
 def test_loader_requires_exact_model_state(tmp_path, monkeypatch, state):
     from safetensors.torch import save_file
+
     import ink_sdk.adapters.timesformer as adapter
     path = tmp_path / "model.safetensors"
     save_file(state, str(path))
@@ -231,7 +233,7 @@ profiles=[p for p in list_profiles() if p.adapter=='timesformer']
 assert len(profiles)==3
 assert all(get_adapter(p).name=='timesformer' for p in profiles)
 """
-    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr
 
 
@@ -245,13 +247,13 @@ def test_check_reports_bad_scale_missing_checkpoint_and_experimental_transfer(tm
 
 def test_full_sdk_pipeline_writes_reverse_map_and_receipt(tmp_path, monkeypatch):
     from safetensors.torch import save_file
+
     import ink_sdk.adapters.timesformer as adapter
     from ink_sdk.runner import infer
     p = profile()
     checkpoint = tmp_path / "model.safetensors"
     save_file(ConstantInk().state_dict(), str(checkpoint))
     pin_fixture(p, checkpoint)
-    monkeypatch.setattr(adapter, "_build_model", lambda p: SpatialInk())
     # Keep a real learned state in the model used by the default loader.
     class LearnedSpatial(SpatialInk):
         def __init__(self): super().__init__(); self.bias = nn.Parameter(torch.tensor(0.))

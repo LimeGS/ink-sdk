@@ -83,6 +83,9 @@ runs the same checks as `ink-sdk doctor`.
 | `canonical_2um@r152-3ddec-v2-l5-epoch13` | 2.399 ± 0.05 µm | 62 | 2D | forward only |
 | `hecate@2.4um` | 2.4 ± 0.048 µm | 64 | 2D / 3D | 3D with `--output-3d` |
 | `hecate@9.6um` | 9.6 ± 0.192 µm | 16 | 2D / 3D | 3D with `--output-3d` |
+| `timesformer@gp-scroll1` | 7.91 ± 0.1 µm | 26 | 2D | Grand Prize Scroll 1; experimental transfer |
+| `timesformer@large-scroll1` | 7.91 ± 0.1 µm | 26 | 2D | Large Scroll 1; experimental transfer |
+| `timesformer@scroll5` | 7.91 ± 0.1 µm | 26 | 2D | Scroll 1 pretrained, PHerc172 fine-tuned; experimental transfer |
 
 `ink-sdk models` lists them; `ink-sdk models --json` also shows checkpoint paths and SHA-256 values.
 
@@ -111,7 +114,7 @@ The receipt is the source of truth. A probability map is not evidence of ink, le
 ---
 
 <details>
-<summary><b>Model notes</b> — 9 µm (seed43, reader-v2), canonical 2 µm, Hecate 2.4 / 9.6</summary>
+<summary><b>Model notes</b> — 9 µm, canonical 2 µm, Hecate, TimeSformer</summary>
 
 Most examples start from a surface volume. For a mesh, replace `--surface-volume ... --pixel-um ...` with
 `--tifxyz ... --ct ... --voxel-um ...`; canonical and Hecate also require `--normal inward|outward` for a mesh.
@@ -192,6 +195,40 @@ ink-sdk infer \
 Hecate 9.6 uses 16 layers. A 2.4 µm source is pooled 4× to 9.6 µm; a native 8.64 µm source is rejected.
 Add `--output-3d` for a 3D zarr.
 
+### TimeSformer GP, Large and Scroll5
+
+```bash
+python -m pip install -e '.[timesformer,fetch]'
+ink-sdk fetch --profile timesformer@gp-scroll1
+
+ink-sdk infer \
+  --profile timesformer@gp-scroll1 \
+  --surface-volume /data/rendered/7.91um.zarr \
+  --pixel-um 7.91 \
+  --out runs/timesformer-gp
+```
+
+Swap the ID for `timesformer@large-scroll1` or `timesformer@scroll5` and fetch that profile first.
+The optional extra pins `timesformer-pytorch==0.4.1`; torch ≥2.6 is required for safe checkpoint inspection.
+GP and Large load safetensors. Scroll5 loads with `weights_only=True`, using inert placeholders for archived
+optimizer/scheduler metadata; unknown globals or any model-state mismatch are rejected. No remote Python
+code is downloaded or executed.
+
+Inputs must be `uint8` at 7.91 ±0.1 µm on **every axis**, with at least 26 layers. The central 26 are scored
+with 64×64 tiles, stride16, `clip[0,200]/200`, sigmoid before bilinear 4×4→64×64, and Hann blending. Batches
+and full-resolution accumulation are bounded separately: full rasters stay on CPU. Nonzero CT intersected
+with Hann support is the output mask; outer zero-weight borders are not scored. Small XY inputs are padded
+and cropped back. Outputs remain fixed-scale float32 probabilities, never independently contrast-normalized.
+
+These profiles default to **reverse depth / reverse primary**, so the saved map is `probability_reverse.npy`.
+This is a reference convention, **not a verified ink-bearing face**. Copied profiles can set direction to
+`forward` or `both` (the latter also produces `mean`); keep `output.primary` consistent. Mesh inference still
+requires an explicit normal/umbilicus for a single direction. There is **no implicit 8.64→7.91 resampling**
+and no new renderer path: supply an already prepared 7.91 µm render, or native compatible CT.
+
+FP32/Hann only; TTA, mixed precision and 3D output are rejected. The physical pitch/transfer adapter remains
+**experimental**, especially across scrolls or scan energies. These maps do not certify ink, letters or accuracy.
+
 </details>
 
 <details>
@@ -235,6 +272,7 @@ two-part mesh. Images are in render orientation. An ensemble image is a display,
 | `render` | `scipy` | `--umbilicus`, `--resample-from-um` |
 | `canonical` | `torch` | canonical 2 µm |
 | `hecate` | `torch`, `scipy` | Hecate 2.4 and 9.6 |
+| `timesformer` | `torch>=2.6`, `safetensors`, `timesformer-pytorch==0.4.1` | GP, Large and Scroll5 |
 | `ink9um` | `torch`, `imagecodecs` | both 9 µm profiles |
 | `fetch` | `huggingface_hub` | `ink-sdk fetch` |
 | `test` | `pytest`, `pytest-cov` | the test suite |

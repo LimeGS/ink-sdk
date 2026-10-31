@@ -1,18 +1,23 @@
 """Pinned GP/Large/Scroll5 TimeSformers; physical transfer remains experimental."""
 from __future__ import annotations
 
-from collections import defaultdict
 import importlib
 import os
-from pathlib import Path
 import pickle
 import time
-from typing import Callable
+from collections import defaultdict
+from collections.abc import Callable
+from pathlib import Path
 
 import numpy as np
 
 from ..contracts import Issue, PreparedInput, RawOutput, RunContext, Segment
-from ..errors import InkSDKError, MissingDependencyError, ModelIntegrityError, ValidationError
+from ..errors import (
+    InkSDKError,
+    MissingDependencyError,
+    ModelIntegrityError,
+    ValidationError,
+)
 from ..profiles import ModelProfile
 from .base import BaseAdapter, resolve_device, source_scale_issue, stats
 from .canonical2um import grid
@@ -41,15 +46,14 @@ def _validate_contract(profile: ModelProfile, ctx: RunContext) -> None:
             or p.normalization != "clip-200-div-200" or p.scale_um != 7.91
             or not 0 < p.scale_tolerance_um <= .1 or not 0 <= p.min_valid_ratio <= 1
             or p.stride is None or not 1 <= p.stride <= 64):
-        raise ValidationError("TimeSformer requires26planes/64px,7.91um,clip-200-div-200 and stride1..64")
+        raise ValidationError("TimeSformer requires 26 planes/64px, 7.91um, clip-200-div-200 and stride 1..64")
     if (profile.execution.blend != "hann" or (ctx.amp or profile.execution.amp) != "fp32"
             or profile.execution.tta or ctx.output_3d):
-        raise ValidationError("TimeSformer supports Hann/FP32 only, without TTA or3D output")
+        raise ValidationError("TimeSformer supports Hann/FP32 only, without TTA or 3D output")
 
 
 class _ArchivedTrainingState:
     """Store discarded archive metadata without running optimizer/scheduler code."""
-    pass
 
 
 def _checkpoint_state(path: Path):
@@ -84,8 +88,8 @@ def _checkpoint_state(path: Path):
 
 def _build_model(profile: ModelProfile):
     try:
-        from torch import nn
         from timesformer_pytorch import TimeSformer
+        from torch import nn
     except ImportError as exc:
         raise MissingDependencyError("install ink-sdk[timesformer] for TimeSformer inference") from exc
 
@@ -132,9 +136,9 @@ class TimeSformerAdapter(BaseAdapter):
             issues.append(issue)
         elif segment.pixel_um is not None and any(not np.isfinite(v) or abs(v - 7.91) > profile.input.scale_tolerance_um
                                                   for v in segment.pixel_um):
-            issues.append(Issue("error", "incompatible-scale", "TimeSformer needs7.91um on every axis"))
+            issues.append(Issue("error", "incompatible-scale", "TimeSformer needs 7.91um on every axis"))
         if segment.depth is not None and segment.depth < 26:
-            issues.append(Issue("error", "insufficient-depth", "TimeSformer needs at least26planes, not BASE's18"))
+            issues.append(Issue("error", "insufficient-depth", "TimeSformer needs at least 26 planes, not BASE's 18"))
         try:
             _validate_contract(profile, ctx)
         except ValidationError as exc:
@@ -152,9 +156,9 @@ class TimeSformerAdapter(BaseAdapter):
         checkpoint = profile.verify_checkpoint(models)
         volume = prepared.array
         if volume.ndim != 3 or volume.dtype != np.uint8 or volume.shape[0] < 26 or min(volume.shape[1:]) < 1:
-            raise ValidationError("TimeSformer requires uint8 ZYX with at least26planes")
+            raise ValidationError("TimeSformer requires uint8 ZYX with at least 26 planes")
         if any(not np.isfinite(v) or abs(v - 7.91) > profile.input.scale_tolerance_um for v in prepared.pixel_um):
-            raise ValidationError("TimeSformer prepared input must have7.91um pixels on every axis")
+            raise ValidationError("TimeSformer prepared input must have 7.91um pixels on every axis")
         lo = volume.shape[0] // 2 - 13
         height, width = volume.shape[1:]
         h, w = max(height, 64), max(width, 64)
@@ -199,7 +203,7 @@ class TimeSformerAdapter(BaseAdapter):
                         logits = model(torch.from_numpy(images).to(device_name))
                         if (not isinstance(logits, torch.Tensor) or logits.shape != (len(positions), 1, 4, 4)
                                 or not torch.isfinite(logits).all()):
-                            raise InkSDKError("TimeSformer returned nonfinite or malformed4x4 logits")
+                            raise InkSDKError("TimeSformer returned nonfinite or malformed 4x4 logits")
                         probability = F.interpolate(logits.float().sigmoid(), (64, 64), mode="bilinear",
                                                     align_corners=False)[:, 0].cpu().numpy()
                         for x, value in zip(positions, probability):
