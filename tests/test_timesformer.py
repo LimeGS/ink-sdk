@@ -268,7 +268,45 @@ def test_full_sdk_pipeline_writes_reverse_map_and_receipt(tmp_path, monkeypatch)
     result = infer(segment, p, RunContext(device="cpu", models_dir=tmp_path, on_degenerate="warn"), out_dir=output)
     assert result.primary == "reverse" and result.primary_map.shape == (80,96)
     np.testing.assert_array_equal(np.load(output/"probability_reverse.npy"), result.primary_map.array)
+    np.testing.assert_array_equal(np.load(output/"probability_primary.npy"), result.primary_map.array)
     receipt = json.loads((output/"INK_SDK_RECEIPT.json").read_text())
     assert receipt["checkpoint"]["verified"] is True
     assert receipt["execution"]["adapter_status"] == "EXPERIMENTAL_PHYSICAL_TRANSFER_UNVALIDATED"
     assert not result.primary_map.valid[20:30,40:50].any()
+
+
+def test_reverse_only_battery_publishes_primary_maps_and_images(tmp_path, monkeypatch):
+    from safetensors.torch import save_file
+
+    import ink_sdk.adapters.timesformer as adapter
+    from ink_sdk.api import InkSDK
+    from ink_sdk.battery import run_battery
+
+    checkpoint = tmp_path / "model.safetensors"
+    save_file(ConstantInk().state_dict(), str(checkpoint))
+    profiles = [profile(identifier) for identifier in IDS]
+    for p in profiles:
+        pin_fixture(p, checkpoint)
+    monkeypatch.setattr(adapter, "_build_model", lambda p: ConstantInk())
+    volume = tmp_path / "input.npy"
+    np.save(volume, np.full((65, 64, 64), 100, dtype=np.uint8))
+    output = tmp_path / "battery"
+    report = run_battery(
+        InkSDK(), volume, 7.91, profiles, output, RunContext(device="cpu", models_dir=tmp_path),
+        centres=(0,), steps=(1,), thresholds=(0.5,), thumb_px=32, say=lambda _: None,
+    )
+    assert len(report["cells"]) == 3 and all(c["ok"] for c in report["cells"])
+    images = {"mosaic_ct_t0.5.png", "mosaic_black_t0.5.png", "stability_t0.5.png"}
+    assert images <= report["images"].keys()
+    assert report["images"]["stability_t0.5.png"]["cells"] == 3
+    for name in images:
+        assert (output / name).read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    for cell in report["cells"]:
+        directory = Path(cell["dir"])
+        assert cell["primary"] == "reverse"
+        np.testing.assert_array_equal(
+            np.load(directory / "probability_primary.npy"), np.load(directory / "probability_reverse.npy"),
+        )
+        receipt = json.loads((directory / "INK_SDK_RECEIPT.json").read_text())
+        assert receipt["input"]["pixel_um"] == [7.91, 7.91, 7.91]
+    assert "data:image/png;base64," in (output / "index.html").read_text()

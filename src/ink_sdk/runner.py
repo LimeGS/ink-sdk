@@ -190,7 +190,7 @@ def infer(
         for key, value in maps.items():
             suffix = "" if key == "forward" else f"_{key}"
             _write_map(output / f"probability{suffix}.npy", value.array)
-        if primary != "forward" and "forward" in maps:
+        if primary != "forward":
             _write_map(output / "probability_primary.npy", maps[primary].array)
         _preview(output / "preview.tif", maps[primary].array)
         volume = None

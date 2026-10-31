@@ -60,7 +60,8 @@ _build_model(profile), _checkpoint_state(path), existing RawOutput/RunContext.
 - [x] Commit only this feature's code/tests/profiles and this plan.
 
 ### Task 2: Verify real weights, document and open PR
-**Files:** README.md;THIRD_PARTY_NOTICES.md;tests/test_timesformer.py;this plan.
+**Files:** README.md;THIRD_PARTY_NOTICES.md;tests/test_timesformer.py;this plan;
+src/ink_sdk/battery.py;src/ink_sdk/runner.py;tests/test_battery.py (review fixes).
 **Interfaces:** consume Task1 profiles/adapter through existing API/CLI.
 - [x] Existing CLI/dummy pipeline/scale/orientation/fetch suite remains green;
   full SDK infer with a small model verifies files, scale, mask and receipt.
@@ -69,7 +70,7 @@ _build_model(profile), _checkpoint_state(path), existing RawOutput/RunContext.
   caches and no replacement of the PHerc1218 runtime/artifacts.
 - [x] Document install extra, three IDs, fetch/infer example, exact physical
   contract/unsupported scales and experimental limitations; acknowledge sources.
-- [ ] One fresh read-only review; one Important/Critical TDD fix pass if needed;
+- [x] One fresh read-only review; one Important/Critical TDD fix pass if needed;
   green full suite/build/packaged profiles verification.
 - [ ] Commit docs/fixes, push only feat/timesformer-profiles, open PR againstmain;
   do not merge. Include tests, limitations and real-weight smoke evidence.
@@ -94,3 +95,12 @@ _build_model(profile), _checkpoint_state(path), existing RawOutput/RunContext.
   /ssd/draft/ink-sdk-timesformer-smoke-20261030, not the PHerc1218 runtime.
   ReceiptSHA c7f8443cb04db1171132de71bf1654600ac97bce9390d32df0c5120a456dbd61.
   Original runtime-sourceSHA remained unchanged. No training/TEST/accuracy claim.
+- Fresh whole-change review found two Important battery integration bugs. RED→GREEN
+  regressions now skip TimeSformer depth steps other than 1 and publish non-forward
+  primary copies, restoring reverse-only mosaics/stability images. Full suite: 101 passed.
+- Rebuilt wheel/sdist contain the reviewed sources and all 11 profiles; running
+  the full suite against the extracted final wheel also passed all 101 tests.
+- Adapter/registry/tests are Ruff-clean. Across all touched Python files, baseline
+  comparison found 0 new findings; 13 pre-existing core warnings remain untouched.
+- The real-weight smoke predates the battery/runner-only fixes. Adapter, profile
+  and other source hashes still match that receipt; both fixes have source/wheel regressions.

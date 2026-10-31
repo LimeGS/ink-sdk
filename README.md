@@ -220,11 +220,14 @@ and full-resolution accumulation are bounded separately: full rasters stay on CP
 with Hann support is the output mask; outer zero-weight borders are not scored. Small XY inputs are padded
 and cropped back. Outputs remain fixed-scale float32 probabilities, never independently contrast-normalized.
 
-These profiles default to **reverse depth / reverse primary**, so the saved map is `probability_reverse.npy`.
+These profiles default to **reverse depth / reverse primary**: `probability_reverse.npy`, also published as
+`probability_primary.npy` for consumers such as battery visualizations.
 This is a reference convention, **not a verified ink-bearing face**. Copied profiles can set direction to
 `forward` or `both` (the latter also produces `mean`); keep `output.primary` consistent. Mesh inference still
 requires an explicit normal/umbilicus for a single direction. There is **no implicit 8.64→7.91 resampling**
 and no new renderer path: supply an already prepared 7.91 µm render, or native compatible CT.
+
+Battery runs these profiles only at depth step 1; other steps are reported as skipped because they change Z spacing.
 
 FP32/Hann only; TTA, mixed precision and 3D output are rejected. The physical pitch/transfer adapter remains
 **experimental**, especially across scrolls or scan energies. These maps do not certify ink, letters or accuracy.

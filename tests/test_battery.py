@@ -3,7 +3,7 @@ import zlib
 import numpy as np
 
 from ink_sdk.battery import plan_battery, png_bytes, window
-from ink_sdk.registry import list_profiles
+from ink_sdk.registry import get_profile, list_profiles
 
 
 def test_window_is_centred_and_spaced():
@@ -28,6 +28,18 @@ def test_plan_without_resample_runs_only_native_8_64_profiles():
     # every other profile needs a resample or is skipped.
     assert {c.profile_id for c in cells} == {"ink_9um@reader-v3", "ink_9um@dense-native-step016000"}
     assert len(skipped) == len(list_profiles()) - 2
+
+
+def test_timesformer_battery_skips_steps_that_change_depth_spacing():
+    profiles = [get_profile(identifier) for identifier in (
+        "timesformer@gp-scroll1", "timesformer@large-scroll1", "timesformer@scroll5",
+    )]
+    cells, skipped = plan_battery(65, 7.91, profiles, (-4, 0, 4), (0, 1, 2), resample_from_um=None)
+    assert len(cells) == 9 and {c.step for c in cells} == {1}
+    assert all(c.layers == tuple(range(19 + c.centre, 45 + c.centre)) for c in cells)
+    assert len(skipped) == 18 and {s["step"] for s in skipped} == {0, 2}
+    assert {s["profile"] for s in skipped} == {p.id for p in profiles}
+    assert all("step 1" in s["reason"] and "spacing" in s["reason"] for s in skipped)
 
 
 def test_reader_v3_profile_matches_its_checkpoint_config():
