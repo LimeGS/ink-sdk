@@ -57,6 +57,10 @@ def get_profile(identifier: str) -> ModelProfile:
 
 def get_adapter(profile: ModelProfile):
     # Lazy imports keep the core usable without torch.
+    if profile.adapter == "timesformer":
+        from .adapters.timesformer import TimeSformerAdapter
+
+        return TimeSformerAdapter()
     if profile.adapter == "ink9um":
         from .adapters.ink9um import Ink9umAdapter
 

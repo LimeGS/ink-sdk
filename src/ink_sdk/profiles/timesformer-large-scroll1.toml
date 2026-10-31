@@ -1,0 +1,43 @@
+schema = "ink-sdk.profile.v1"
+id = "timesformer@large-scroll1"
+adapter = "timesformer"
+family = "surface-volume-2d"
+
+[source]
+repo = "scrollprize/timesformer_large_scroll1_01122024"
+revision = "7e8b37ce66b2497b4af1ad07ae3d7d8f5c5fa990"
+upstream = "lucidrains/TimeSformer-pytorch"
+upstream_revision = "0.4.1"
+url = "https://huggingface.co/scrollprize/timesformer_large_scroll1_01122024"
+license = "MIT"
+
+[checkpoint]
+path = "timesformer-large-scroll1/model.safetensors"
+upstream_path = "model.safetensors"
+sha256 = "c85dd722aad3734476dd6d8f14fae7a249a0a3c019fbd68f894558ae381e3e9d"
+bytes = 336694640
+
+[input]
+kind = "surface-volume"
+family = "surface-volume-2d"
+scale_um = 7.91
+scale_tolerance_um = 0.1
+depth = 26
+normalization = "clip-200-div-200"
+tile = 64
+overlap = 0.75
+stride = 16
+min_valid_ratio = 0.0
+clip = 200.0
+divisor = 200.0
+
+[execution]
+direction = "reverse"
+blend = "hann"
+batch = 16
+amp = "fp32"
+
+[output]
+primary = "reverse"
+no_ink_floor = 0.0
+floor_provenance = "not-declared"

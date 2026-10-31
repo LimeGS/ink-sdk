@@ -203,6 +203,7 @@ class ModelProfile(_Strict):
             "ink9um": "surface-volume-2d",
             "canonical2um": "surface-volume-2d",
             "hecate": "surface-volume-3d2d",
+            "timesformer": "surface-volume-2d",
         }
         if self.adapter not in allowed:
             raise ValueError(f"unknown adapter {self.adapter!r}")

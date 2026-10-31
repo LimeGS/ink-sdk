@@ -99,6 +99,10 @@ def plan_battery(
         depth = int(p.input.depth) * fz
         for s in steps:
             for c in centres:
+                if p.adapter == "timesformer" and s != 1:
+                    skipped.append({"profile": p.id, "centre": c, "step": s,
+                                    "reason": "TimeSformer requires step 1 to preserve 7.91 um Z spacing"})
+                    continue
                 idx = window(n_layers, depth, int(c), int(s))
                 if idx is None:
                     skipped.append({"profile": p.id, "centre": c, "step": s,

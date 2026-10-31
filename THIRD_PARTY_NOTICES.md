@@ -27,6 +27,13 @@ provenance of the inference code is explicit.
 
 ## Model checkpoints
 
+The TimeSformer adapter uses the optional MIT-licensed
+[`lucidrains/TimeSformer-pytorch`](https://github.com/lucidrains/TimeSformer-pytorch)
+package, pinned to version `0.4.1`, rather than vendoring it. Its wrapper follows
+the architecture published in the pinned ScrollPrize Hugging Face repositories
+below: GP/Scroll5 use depth8,dim512,heads6; Large uses depth16,dim512,heads8.
+The sliding-window, safe loading and receipt integration are local ink-sdk code.
+
 The `profiles/*.toml` files pin checkpoint repository revisions, paths,
 byte sizes and SHA-256 digests. The checkpoint repositories' model cards and
 their own licenses govern the weights. `ink-sdk fetch` only downloads a
@@ -42,6 +49,9 @@ checkpoint when explicitly invoked; inference never downloads weights.
 | `canonical_2um@r152-3ddec-v2-l5-epoch13` | `scrollprize/ink_canonical_2um` | `075855bc69317ef6febf39a0d9d687b27d2b7c29` |
 | `hecate@2.4um` | `scrollprize/hecate` | `9cb86e500e944b11a06a7020403cde5dffb5bcb2` |
 | `hecate@9.6um` | `scrollprize/hecate` | `9cb86e500e944b11a06a7020403cde5dffb5bcb2` |
+| `timesformer@gp-scroll1` | `scrollprize/timesformer_GP_scroll1` (MIT) | `61b81d31ddb93c89a2b3b00c66769d18bd96ccb2` |
+| `timesformer@large-scroll1` | `scrollprize/timesformer_large_scroll1_01122024` (MIT) | `7e8b37ce66b2497b4af1ad07ae3d7d8f5c5fa990` |
+| `timesformer@scroll5` | `scrollprize/timesformer_scroll5_27112024` (MIT) | `396d39b9a66cbd21c9cbe453c4540d9516707020` |
 
 ## vc_render_tifxyz / volume-cartographer
 
@@ -53,4 +63,5 @@ Obtain it from its upstream release, comply with its license, and point
 ## Python dependencies
 
 The runtime dependencies (`numpy`, `pydantic`, `typer`, `zarr`, `tifffile`,
-and optionally `scipy`, `torch`, `huggingface_hub`, `safetensors`) keep their own licenses.
+and optionally `scipy`, `torch`, `huggingface_hub`, `safetensors`, `timesformer-pytorch`
+and its dependencies) keep their own licenses.
