@@ -5,7 +5,6 @@ import importlib
 import os
 import pickle
 import time
-from collections import defaultdict
 from collections.abc import Callable
 from pathlib import Path
 
@@ -56,6 +55,11 @@ class _ArchivedTrainingState:
     """Store discarded archive metadata without running optimizer/scheduler code."""
 
 
+def _archived_defaultdict(_default_factory=None):
+    # Training factories are unused; Torch 2.11+ requires plain dict SETITEM(S) targets.
+    return {}
+
+
 def _checkpoint_state(path: Path):
     try:
         import torch
@@ -70,11 +74,12 @@ def _checkpoint_state(path: Path):
                 raise MissingDependencyError("TimeSformer archives require torch>=2.6; install ink-sdk[timesformer]")
             inert = [(_ArchivedTrainingState, name) for name in
                      ("torch.optim.adamw.AdamW", "torch.optim.lr_scheduler.CosineAnnealingLR")]
-            allowed = {name for _, name in inert} | {"builtins.dict", "collections.defaultdict"}
+            inert.append((_archived_defaultdict, "collections.defaultdict"))
+            allowed = {name for _, name in inert} | {"builtins.dict"}
             unknown = set(torch.serialization.get_unsafe_globals_in_checkpoint(path)) - allowed
             if unknown:
                 raise ModelIntegrityError(f"unapproved checkpoint globals: {sorted(unknown)}")
-            with torch.serialization.safe_globals([*inert, dict, defaultdict]):
+            with torch.serialization.safe_globals([*inert, dict]):
                 payload = torch.load(path, map_location="cpu", weights_only=True)
             state = payload.get("state_dict") if isinstance(payload, dict) else None
         else:

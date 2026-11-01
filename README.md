@@ -211,8 +211,8 @@ ink-sdk infer \
 Swap the ID for `timesformer@large-scroll1` or `timesformer@scroll5` and fetch that profile first.
 The optional extra pins `timesformer-pytorch==0.4.1`; torch ≥2.6 is required for safe checkpoint inspection.
 GP and Large load safetensors. Scroll5 loads with `weights_only=True`, using inert placeholders for archived
-optimizer/scheduler metadata; unknown globals or any model-state mismatch are rejected. No remote Python
-code is downloaded or executed.
+optimizer/scheduler metadata and plain dictionaries for training-state `defaultdict`s (including on Torch 2.11+).
+Unknown globals or any model-state mismatch are rejected. No remote Python code is downloaded or executed.
 
 Inputs must be `uint8` at 7.91 ±0.1 µm on **every axis**, with at least 26 layers. The central 26 are scored
 with 64×64 tiles, stride16, `clip[0,200]/200`, sigmoid before bilinear 4×4→64×64, and Hann blending. Batches

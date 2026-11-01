@@ -195,10 +195,14 @@ def test_checkpoint_hash_is_checked_before_model_factory(tmp_path):
                                                       profile(), RunContext(device="cpu", models_dir=tmp_path))
 
 
-def test_archive_training_objects_are_inert_and_unknown_globals_are_rejected(tmp_path, monkeypatch):
+@pytest.mark.parametrize("parameter_count", [1, 2], ids=["SETITEM", "SETITEMS"])
+def test_archive_training_objects_are_inert_and_unknown_globals_are_rejected(tmp_path, monkeypatch, parameter_count):
     from ink_sdk.adapters.timesformer import _checkpoint_state
-    parameter = nn.Parameter(torch.ones(1))
-    optimizer = torch.optim.AdamW([parameter])
+    parameters = [nn.Parameter(torch.ones(1)) for _ in range(parameter_count)]
+    optimizer = torch.optim.AdamW(parameters)
+    for parameter in parameters:
+        parameter.grad = torch.ones_like(parameter)
+    optimizer.step()
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 10)
     path = tmp_path / "archive.ckpt"
     torch.save({"state_dict": {"bias": torch.tensor(2.)}, "lr_schedulers": [scheduler]}, path)
