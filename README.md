@@ -86,6 +86,9 @@ runs the same checks as `ink-sdk doctor`.
 | `timesformer@gp-scroll1` | 7.91 ± 0.1 µm | 26 | 2D | Grand Prize Scroll 1; experimental transfer |
 | `timesformer@large-scroll1` | 7.91 ± 0.1 µm | 26 | 2D | Large Scroll 1; experimental transfer |
 | `timesformer@scroll5` | 7.91 ± 0.1 µm | 26 | 2D | Scroll 1 pretrained, PHerc172 fine-tuned; experimental transfer |
+| `ink_9um@trace-v3b-step5000` | 9.362 ± 0.1 µm | 17 | 2D | TRACE v3B; VILLA; both directions; GitHub release |
+| `v8in@ink-8um-v8in` | 8.64 ± 0.75 µm | 24 | 2D | v8-in (PHerc. 1447 first letters); both directions |
+| `v8in@pherc0306b-ahn-s0` / `-s1` / `-s2` | 8.64 ± 0.75 µm | 24 | 2D | A-hn seeds (PHerc. 0306B claim); both directions |
 
 `ink-sdk models` lists them; `ink-sdk models --json` also shows checkpoint paths and SHA-256 values.
 
@@ -95,6 +98,36 @@ dense_native ([Nieuwlaar/ink9um-dense-native](https://huggingface.co/Nieuwlaar/i
 published as weights plus training config, not as the `.pth` VILLA loads. `ink-sdk fetch` downloads both pinned
 files and rebuilds the checkpoint with his recipe, which needs `torch` and `safetensors`. The pinned digest was
 produced with torch 2.10; another torch version may write different bytes, and `fetch` then says so.
+
+### The PHerc. 0306B rule: TRACE v3B × A-hn
+
+Liam Warner and Nicola Bodill's First Letters result on PHerc. 0306B multiplies two ink maps pixel by pixel, so a
+pixel shows as ink only where both models agree: TRACE v3B
+([Jashann/vesuvius-scrolling](https://github.com/Jashann/vesuvius-scrolling), CC BY-NC-SA 4.0) and A-hn, the mean
+of three fine-tunes of v8-in ([Prodigle/pherc0306b-ink-ahn](https://huggingface.co/Prodigle/pherc0306b-ink-ahn),
+CC BY-NC 4.0; code and method in [SirProdigle/pherc0306b-first-letters](https://github.com/SirProdigle/pherc0306b-first-letters)).
+On PHerc. 0841 known text their records give TRACE v3B × A-hn AUC 0.874 with 6.1 % false ink and
+TRACE v3B × v8-in 0.871 / 5.9 %, against 0.840 / 12.1 % for v8-in alone.
+
+```bash
+ink-sdk fetch --profile v8in@ink-8um-v8in          # weights + predict.py + ink8um (the v8-in lane's code)
+for s in 0 1 2; do ink-sdk fetch --profile v8in@pherc0306b-ahn-s$s; done
+ink-sdk fetch --profile ink_9um@trace-v3b-step5000 # GitHub release asset, pinned by size and sha256
+
+for s in 0 1 2; do ink-sdk infer -p v8in@pherc0306b-ahn-s$s --surface-volume sv.zarr --voxel-um 8.64 --out runs/ahn$s; done
+ink-sdk infer -p ink_9um@trace-v3b-step5000 --surface-volume sv.zarr --voxel-um 8.64 --resample-from-um 8.64 \
+  --villa ~/villa --out runs/trace
+ink-sdk combine runs/ahn0 runs/ahn1 runs/ahn2 --mode mean --out runs/ahn
+ink-sdk combine runs/trace runs/ahn --mode product --out runs/claim
+```
+
+The v8in lane runs the model repository's own `predict.py` (64 px tiles, stride 21, Gaussian stitch, central 24
+layers); set `V8IN_CODE` to a checkout of YoussefMoNader/ink-8um-v8in to use another copy. Checked against a direct
+`predict.py` run on the same 8.64 µm surface volume: both directions bit-identical. A-hn's `config.json` sets
+`reverse_layers: true` while v8-in's does not; the lane always passes the order explicitly and writes both
+directions, so check which one reads on your data. TRACE's authors advise it for 9.36 µm segments and report no gain
+over the base model at the one known 8.64 µm ink site (PHerc. 1447); its checkpoint was selected on PHerc0841 and
+PHerc0139 w043 (see their model card).
 
 ## What a run writes
 

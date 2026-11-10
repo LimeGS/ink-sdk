@@ -1,0 +1,42 @@
+schema = "ink-sdk.profile.v1"
+id = "v8in@ink-8um-v8in"
+adapter = "v8in"
+family = "surface-volume-2d"
+# v8-in by Youssef Nader, the model behind the first letters of PHerc. 1447.
+
+[source]
+repo = "YoussefMoNader/ink-8um-v8in"
+revision = "d89166b41a3f5fad7749b3d7c0fdd1bd3695d844"
+upstream = "YoussefMoNader/ink-8um-v8in"
+upstream_revision = "d89166b41a3f5fad7749b3d7c0fdd1bd3695d844"
+url = "https://huggingface.co/YoussefMoNader/ink-8um-v8in"
+license = "MIT"
+
+[checkpoint]
+path = "ink-8um-v8in/model.safetensors"
+upstream_path = "model.safetensors"
+sha256 = "3b94548d7f9ba9f99bc4b0ad8cafcec6d42585c06304e1bd11e47b5d0f88c4cd"
+bytes = 333532180
+
+[input]
+kind = "surface-volume"
+family = "surface-volume-2d"
+# Trained at 8.64 um (PHerc. 1447); the tolerance also admits the 9.362 um protocol, as for Reader v3.
+scale_um = 8.64
+scale_tolerance_um = 0.75
+# predict.py uses the central 24 layers (config in_depth 24); A-hn reads the same window (layers 8..31 of 41).
+depth = 24
+normalization = "from-checkpoint"
+tile = 64
+stride = 21
+
+[execution]
+direction = "both"
+blend = "gaussian"
+batch = 8
+amp = "default"
+
+[output]
+primary = "forward"
+no_ink_floor = 0.0
+floor_provenance = "not-declared"

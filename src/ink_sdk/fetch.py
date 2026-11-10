@@ -39,12 +39,16 @@ def fetch_profile(
             raise ModelIntegrityError(
                 f"existing checkpoint does not match the pin: {destination}. Pass --overwrite."
             )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if profile.checkpoint.url is not None:
+        return _fetch_url(profile, destination, progress)
     try:
         from huggingface_hub import hf_hub_download
     except ImportError as exc:
         raise MissingDependencyError("fetch needs huggingface_hub; install ink-sdk[fetch]") from exc
 
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    if profile.adapter == "v8in":
+        return _fetch_v8in(profile, destination, progress)
     if profile.checkpoint.rebuild is not None:
         return _fetch_rebuild(profile, destination, hf_hub_download, progress)
     with tempfile.TemporaryDirectory(prefix="ink-sdk-fetch-", dir=destination.parent) as tmp:
@@ -147,6 +151,74 @@ def _fetch_rebuild(profile: ModelProfile, destination: Path, hf_hub_download, pr
             shutil.move(str(built), destination)
         except OSError as exc:
             raise ModelIntegrityError(f"could not place checkpoint at {destination}: {exc}") from exc
+    if progress:
+        progress(f"placed {destination}")
+    return destination
+
+
+def _check_pin(path: Path, profile: ModelProfile, label: str) -> None:
+    if path.stat().st_size != profile.checkpoint.bytes:
+        raise ModelIntegrityError(
+            f"downloaded size {path.stat().st_size} != pinned {profile.checkpoint.bytes}: {label}"
+        )
+    digest = _hash(path)
+    if digest != profile.checkpoint.sha256:
+        raise ModelIntegrityError(f"downloaded digest {digest} != pinned {profile.checkpoint.sha256}: {label}")
+
+
+def _fetch_url(profile: ModelProfile, destination: Path, progress) -> Path:
+    """A checkpoint published as a plain https file (e.g. a GitHub release asset), pinned by size and sha256."""
+    import urllib.request
+
+    url = profile.checkpoint.url
+    with tempfile.TemporaryDirectory(prefix="ink-sdk-fetch-", dir=destination.parent) as tmp:
+        if progress:
+            progress(f"downloading {url}")
+        part = Path(tmp) / destination.name
+        try:
+            with urllib.request.urlopen(url, timeout=600) as response, part.open("wb") as handle:
+                shutil.copyfileobj(response, handle, 1 << 20)
+        except Exception as exc:
+            raise ModelIntegrityError(f"download failed for {url}: {exc}") from exc
+        _check_pin(part, profile, url)
+        try:
+            shutil.move(str(part), destination)
+        except OSError as exc:
+            raise ModelIntegrityError(f"could not place checkpoint at {destination}: {exc}") from exc
+    if progress:
+        progress(f"placed {destination}")
+    return destination
+
+
+def _fetch_v8in(profile: ModelProfile, destination: Path, progress) -> Path:
+    """v8-in style checkpoints run with the model repository's predict.py, which needs the config.json next to
+    the weights and, for the base repository, predict.py and the ink8um package. Download that folder at the
+    pinned revision, then check the weights against the pin."""
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError as exc:
+        raise MissingDependencyError("fetch needs huggingface_hub; install ink-sdk[fetch]") from exc
+    upstream = Path(profile.upstream_checkpoint_path)
+    root = profile.checkpoint_path(Path("/")).relative_to("/")
+    local_root = destination
+    for _ in upstream.parts:
+        local_root = local_root.parent
+    folder = upstream.parent.as_posix()
+    patterns = [f"{folder}/*"] if folder not in ("", ".") else ["*.safetensors", "*.json", "*.py", "ink8um/**"]
+    if progress:
+        progress(f"downloading {profile.source.repo} {patterns} @{profile.source.revision} -> {local_root}")
+    try:
+        snapshot_download(
+            repo_id=profile.source.repo,
+            revision=profile.source.revision,
+            allow_patterns=patterns,
+            local_dir=str(local_root),
+        )
+    except Exception as exc:
+        raise ModelIntegrityError(f"download failed for {profile.source.repo} ({root}): {exc}") from exc
+    if not destination.is_file():
+        raise ModelIntegrityError(f"{profile.source.repo} has no {upstream} at {profile.source.revision}")
+    _check_pin(destination, profile, f"{profile.source.repo}/{upstream}")
     if progress:
         progress(f"placed {destination}")
     return destination

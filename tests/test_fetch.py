@@ -157,3 +157,50 @@ def test_rebuild_pth_is_deterministic(tmp_path):
         assert loaded["step"] == 7 and loaded["config"] == {"in_channels": 1}
         assert torch.equal(loaded["model"]["x"], torch.arange(6, dtype=torch.float32))
     assert digests[0] == digests[1]
+
+
+def test_fetch_url_checkpoint_is_pinned(tmp_path, monkeypatch):
+    import io
+    import urllib.request
+
+    payload = b"trace-checkpoint"
+    profile = get_profile("ink_9um@trace-v3b-step5000").model_copy(deep=True)
+    profile.checkpoint.bytes = len(payload)
+    profile.checkpoint.sha256 = hashlib.sha256(payload).hexdigest()
+    seen = []
+
+    def fake_urlopen(url, timeout=None):
+        seen.append(url)
+        return io.BytesIO(payload)
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    destination = fetch_profile(profile, models_dir=tmp_path / "models")
+    assert destination.read_bytes() == payload and seen == [profile.checkpoint.url]
+
+    profile.checkpoint.sha256 = "0" * 64
+    with pytest.raises(ModelIntegrityError):
+        fetch_profile(profile, models_dir=tmp_path / "other")
+
+
+def test_fetch_v8in_downloads_the_checkpoint_folder(tmp_path, monkeypatch):
+    import huggingface_hub
+
+    payload = b"ahn-weights"
+    profile = get_profile("v8in@pherc0306b-ahn-s0").model_copy(deep=True)
+    profile.checkpoint.bytes = len(payload)
+    profile.checkpoint.sha256 = hashlib.sha256(payload).hexdigest()
+    seen = {}
+
+    def fake_snapshot(*, repo_id, revision, allow_patterns, local_dir):
+        seen.update(repo_id=repo_id, revision=revision, allow_patterns=allow_patterns, local_dir=local_dir)
+        folder = Path(local_dir) / "checkpoints" / "hn4_s0_final"
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "model.safetensors").write_bytes(payload)
+        (folder / "config.json").write_text("{}")
+        return local_dir
+
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", fake_snapshot)
+    destination = fetch_profile(profile, models_dir=tmp_path / "models")
+    assert destination.read_bytes() == payload and (destination.parent / "config.json").is_file()
+    assert seen["allow_patterns"] == ["checkpoints/hn4_s0_final/*"]
+    assert Path(seen["local_dir"]) == tmp_path / "models" / "pherc0306b-ink-ahn"

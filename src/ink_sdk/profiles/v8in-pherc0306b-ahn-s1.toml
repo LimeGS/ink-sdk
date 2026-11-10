@@ -1,0 +1,42 @@
+schema = "ink-sdk.profile.v1"
+id = "v8in@pherc0306b-ahn-s1"
+adapter = "v8in"
+family = "surface-volume-2d"
+# A-hn seed 1 (Liam Warner & Nicola Bodill), fine-tune of v8-in for PHerc. 0306B. The claim map is the mean of seeds 0-2 (`ink-sdk combine --mode mean`) times TRACE v3B (`--mode product`). Needs the v8-in code (fetch v8in@ink-8um-v8in first, or set V8IN_CODE).
+
+[source]
+repo = "Prodigle/pherc0306b-ink-ahn"
+revision = "e57c4d541c239e06450a98c1cf2015d3de8d887e"
+upstream = "YoussefMoNader/ink-8um-v8in"
+upstream_revision = "d89166b41a3f5fad7749b3d7c0fdd1bd3695d844"
+url = "https://huggingface.co/Prodigle/pherc0306b-ink-ahn"
+license = "CC-BY-NC-4.0"
+
+[checkpoint]
+path = "pherc0306b-ink-ahn/checkpoints/hn4_s1_final/model.safetensors"
+upstream_path = "checkpoints/hn4_s1_final/model.safetensors"
+sha256 = "5c2740c1f33ee5db73ca97425669607a2ffe4ae9af8b9d09d61f1c43165e60ad"
+bytes = 333532180
+
+[input]
+kind = "surface-volume"
+family = "surface-volume-2d"
+# Trained at 8.64 um (PHerc. 1447); the tolerance also admits the 9.362 um protocol, as for Reader v3.
+scale_um = 8.64
+scale_tolerance_um = 0.75
+# predict.py uses the central 24 layers (config in_depth 24); A-hn reads the same window (layers 8..31 of 41).
+depth = 24
+normalization = "from-checkpoint"
+tile = 64
+stride = 21
+
+[execution]
+direction = "both"
+blend = "gaussian"
+batch = 8
+amp = "default"
+
+[output]
+primary = "forward"
+no_ink_floor = 0.0
+floor_provenance = "not-declared"

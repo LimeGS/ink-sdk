@@ -17,7 +17,7 @@ def test_window_is_centred_and_spaced():
 def test_plan_skips_profiles_the_scale_does_not_allow():
     cells, skipped = plan_battery(65, 8.64, list_profiles(), (-4, 0, 4), (1, 2), resample_from_um=8.64)
     ran = {c.profile_id for c in cells}
-    assert all(p.startswith("ink_9um") for p in ran)
+    assert all(p.startswith(("ink_9um", "v8in")) for p in ran)
     assert any("hecate@9.6um" in s["profile"] for s in skipped)
     assert len(cells) == len(ran) * 3 * 2
 
@@ -25,9 +25,12 @@ def test_plan_skips_profiles_the_scale_does_not_allow():
 def test_plan_without_resample_runs_only_native_8_64_profiles():
     cells, skipped = plan_battery(65, 8.64, list_profiles(), (0,), (1,), resample_from_um=None)
     # Reader V3 and dense_native are pinned at 9.362 +- 0.75 um, so 8.64 um is native to both;
-    # every other profile needs a resample or is skipped.
-    assert {c.profile_id for c in cells} == {"ink_9um@reader-v3", "ink_9um@dense-native-step016000"}
-    assert len(skipped) == len(list_profiles()) - 2
+    # the v8in profiles are pinned at 8.64 +- 0.75 um; every other profile needs a resample or is skipped
+    # (TRACE v3B is pinned at 9.362 +- 0.1 um, as its authors advise).
+    native = {"ink_9um@reader-v3", "ink_9um@dense-native-step016000", "v8in@ink-8um-v8in",
+              "v8in@pherc0306b-ahn-s0", "v8in@pherc0306b-ahn-s1", "v8in@pherc0306b-ahn-s2"}
+    assert {c.profile_id for c in cells} == native
+    assert len(skipped) == len(list_profiles()) - len(native)
 
 
 def test_timesformer_battery_skips_steps_that_change_depth_spacing():

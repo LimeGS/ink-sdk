@@ -73,4 +73,8 @@ def get_adapter(profile: ModelProfile):
         from .adapters.hecate import HecateAdapter
 
         return HecateAdapter()
+    if profile.adapter == "v8in":
+        from .adapters.v8in import V8inAdapter
+
+        return V8inAdapter()
     raise ValidationError(f"unknown adapter {profile.adapter!r}")

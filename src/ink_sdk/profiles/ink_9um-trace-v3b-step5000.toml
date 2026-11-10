@@ -1,0 +1,44 @@
+schema = "ink-sdk.profile.v1"
+id = "ink_9um@trace-v3b-step5000"
+adapter = "ink9um"
+family = "surface-volume-2d"
+# TRACE v3B (Jashanjot Singh Gill & Nhat Nam Tran): ink_9um fine-tuned on the organisers' real 9.362 um surface
+# volumes and fragment scans. One half of the PHerc. 0306B claim rule (TRACE v3B x A-hn). The authors advise it for
+# 9.36 um segments; 8.64 um scans were resampled in-plane to 9.362 um in training (pass --resample-from-um 8.64).
+# Checkpoint selection used PHerc0841 and PHerc0139 w043 (see the model card).
+
+[source]
+repo = "Jashann/vesuvius-scrolling"
+revision = "4f4997adcccaa9124ab5af02605233f7e3388c69"
+upstream = "ScrollPrize/villa"
+upstream_revision = "3ea17f54a9b3d5fd1aaf73e1d2c8386dbaa9f30e"
+url = "https://github.com/Jashann/vesuvius-scrolling/blob/main/MODEL_CARD.md"
+license = "CC-BY-NC-SA-4.0"
+
+[checkpoint]
+path = "trace/v3B_best.pth"
+upstream_path = "v3B_best.pth"
+url = "https://github.com/Jashann/vesuvius-scrolling/releases/download/v1.0/v3B_best.pth"
+sha256 = "812ffe2b42b3293974052ebbee60a0fe939ca2bfc3f03a517a0bc2e2339e5da2"
+bytes = 272882569
+
+[input]
+kind = "surface-volume"
+family = "surface-volume-2d"
+scale_um = 9.362
+scale_tolerance_um = 0.1
+depth = 17
+normalization = "from-checkpoint"
+tile = 128
+overlap = 0.5
+
+[execution]
+direction = "both"
+blend = "hann"
+batch = 1
+amp = "bf16"
+
+[output]
+primary = "forward"
+no_ink_floor = 0.0
+floor_provenance = "not-declared"

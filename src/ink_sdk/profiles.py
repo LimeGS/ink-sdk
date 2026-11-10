@@ -81,6 +81,16 @@ class Checkpoint(_Strict):
     sha256: str
     bytes: int
     rebuild: Rebuild | None = None
+    # Direct download for checkpoints published outside the Hugging Face Hub (e.g. a GitHub release asset).
+    # `fetch` downloads it and checks the pinned size and sha256 like any other checkpoint.
+    url: str | None = None
+
+    @field_validator("url")
+    @classmethod
+    def _https(cls, value: str | None) -> str | None:
+        if value is not None and not value.startswith("https://"):
+            raise ValueError("checkpoint.url must be an https URL")
+        return value
 
     @field_validator("path")
     @classmethod
@@ -204,6 +214,7 @@ class ModelProfile(_Strict):
             "canonical2um": "surface-volume-2d",
             "hecate": "surface-volume-3d2d",
             "timesformer": "surface-volume-2d",
+            "v8in": "surface-volume-2d",
         }
         if self.adapter not in allowed:
             raise ValueError(f"unknown adapter {self.adapter!r}")

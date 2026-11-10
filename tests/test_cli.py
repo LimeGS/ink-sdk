@@ -13,7 +13,7 @@ def test_models_json_lists_all_profiles():
     result = runner.invoke(app, ["models", "--json"])
     assert result.exit_code == 0, result.output
     rows = json.loads(result.output)
-    assert len(rows) == 11
+    assert len(rows) == 16
     assert {row["id"] for row in rows} == {
         "ink_9um@scrollprize-seed42-step75000",
         "ink_9um@scrollprize-seed43-step75000",
@@ -26,6 +26,11 @@ def test_models_json_lists_all_profiles():
         "timesformer@gp-scroll1",
         "timesformer@large-scroll1",
         "timesformer@scroll5",
+        "ink_9um@trace-v3b-step5000",
+        "v8in@ink-8um-v8in",
+        "v8in@pherc0306b-ahn-s0",
+        "v8in@pherc0306b-ahn-s1",
+        "v8in@pherc0306b-ahn-s2",
     }
 
 
