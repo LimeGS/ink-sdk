@@ -377,6 +377,19 @@ def infer(
         typer.echo(f"p50={stats.get('p50')} p99={stats.get('p99')} max={stats.get('max')}")
 
 
+@app.command("combine")
+def combine_cmd(
+    runs: list[Path] = typer.Argument(..., help="`ink-sdk infer` output folders, one per profile."),
+    mode: str = typer.Option("product", "--mode", help="product (ink only where all agree) | mean"),
+    side: str = typer.Option("forward", "--side", help="forward | reverse"),
+    out: Path = typer.Option(Path("combined"), "--out", "-o"),
+) -> None:
+    """Combine maps of several profiles pixel by pixel (product = the PHerc. 0306B claim rule)."""
+    from .combine import combine
+
+    typer.echo(json.dumps(_guard(lambda: combine(runs, mode, side, out)), indent=2))
+
+
 @app.command("orient")
 def orient_cmd(
     tifxyz: Path = typer.Option(..., "--tifxyz", help="Mesh the surface volume was rendered from."),

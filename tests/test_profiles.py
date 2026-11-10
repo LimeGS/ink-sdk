@@ -21,6 +21,11 @@ def test_builtin_profiles_are_exact():
         "timesformer@gp-scroll1",
         "timesformer@large-scroll1",
         "timesformer@scroll5",
+        "ink_9um@trace-v3b-step5000",
+        "v8in@ink-8um-v8in",
+        "v8in@pherc0306b-ahn-s0",
+        "v8in@pherc0306b-ahn-s1",
+        "v8in@pherc0306b-ahn-s2",
     }
     assert get_profile("hecate@9.6um").input.depth == 16
     assert get_profile("canonical_2um@r152-3ddec-v2-l5-epoch13").input.depth == 62
@@ -30,6 +35,13 @@ def test_builtin_profiles_are_exact():
     assert dense.checkpoint.rebuild is not None and dense.checkpoint.rebuild.step == 16000
     assert dense.checkpoint.rebuild.weights.sha256.startswith("d3d95dc4")
     assert dense.input.scale_um == 9.362 and dense.input.depth == 17
+    trace = get_profile("ink_9um@trace-v3b-step5000")
+    assert trace.checkpoint.sha256.startswith("812ffe2b") and trace.checkpoint.url.startswith("https://github.com/")
+    assert trace.input.scale_um == 9.362 and trace.input.depth == 17
+    for seed, prefix in ((0, "9a281284"), (1, "5c2740c1"), (2, "a294716b")):
+        ahn = get_profile(f"v8in@pherc0306b-ahn-s{seed}")
+        assert ahn.adapter == "v8in" and ahn.input.depth == 24 and ahn.checkpoint.sha256.startswith(prefix)
+    assert get_profile("v8in@ink-8um-v8in").checkpoint.sha256.startswith("3b94548d")
 
 
 def test_profile_can_be_loaded_from_a_path(tmp_path):
