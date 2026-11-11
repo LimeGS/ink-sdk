@@ -1,0 +1,49 @@
+schema = "ink-sdk.profile.v1"
+id = "ink_9um@rectina-m4"
+adapter = "ink9um"
+family = "surface-volume-2d"
+# Rectina m4 (Giovanni Pellerano / evilaliv3): an ink_9um reader trained from scratch (vesuvius_unet_3d_stem_2d,
+# crop [17, 384, 384]) on 87 segments of 8 scrolls (0139, 0500P2, 0009B, Paris4, 0814, 1667, 0343P, 0172), the last
+# checkpoint of stage s4. The card compares it with Reader v3 on 14 units, including 8.64 um controls (rolled
+# PHerc. 0343, PHerc. 1447 w058/w060), so the tolerance covers 8.64 natively like Reader v3.
+# The card's numbers come from the author's own reader: mean over 7 depth starts (planes 0-6 of a 23-plane stack),
+# 2 views (identity and 180 degrees), 4 lattices shifted by a quarter patch, bicubic renders. This profile runs the
+# checkpoint through the standard ink9um lane (one 17-layer window, Hann blend), so its maps are not the card's maps.
+# Trained with villa main 7e6b82164 plus a sampler/augmentation patch; the card loads it strictly with villa's
+# ink_detection (InkConfig.from_mapping + make_model).
+
+[source]
+repo = "evilaliv3/rectina"
+revision = "2f9eaf043512be4f89d22a3d39804dc55e387585"
+upstream = "ScrollPrize/villa"
+upstream_revision = "3ea17f54a9b3d5fd1aaf73e1d2c8386dbaa9f30e"
+url = "https://huggingface.co/evilaliv3/rectina/tree/main/m4"
+license = "CC-BY-NC-4.0"
+
+[checkpoint]
+path = "rectina/m4/ckpt_020000.pth"
+upstream_path = "m4/ckpt_020000.pth"
+sha256 = "15e3814db216149d27dcbf0316999d9773c0a51d0dc24a3b561b07a4ad6f4e72"
+bytes = 276652215
+
+[input]
+kind = "surface-volume"
+family = "surface-volume-2d"
+scale_um = 9.362
+scale_tolerance_um = 0.75
+depth = 17
+normalization = "from-checkpoint"
+tile = 384
+overlap = 0.5
+
+[execution]
+direction = "both"
+blend = "hann"
+batch = 1
+amp = "bf16"
+
+[output]
+primary = "forward"
+# Scores in [0, 1] that rank ink against papyrus; the card says they are not calibrated probabilities.
+no_ink_floor = 0.0
+floor_provenance = "not-declared"

@@ -24,10 +24,10 @@ def test_plan_skips_profiles_the_scale_does_not_allow():
 
 def test_plan_without_resample_runs_only_native_8_64_profiles():
     cells, skipped = plan_battery(65, 8.64, list_profiles(), (0,), (1,), resample_from_um=None)
-    # Reader V3 and dense_native are pinned at 9.362 +- 0.75 um, so 8.64 um is native to both;
+    # Reader V3, dense_native and Rectina m4 are pinned at 9.362 +- 0.75 um, so 8.64 um is native to them;
     # the v8in profiles are pinned at 8.64 +- 0.75 um; every other profile needs a resample or is skipped
     # (TRACE v3B is pinned at 9.362 +- 0.1 um, as its authors advise).
-    native = {"ink_9um@reader-v3", "ink_9um@dense-native-step016000", "v8in@ink-8um-v8in",
+    native = {"ink_9um@reader-v3", "ink_9um@dense-native-step016000", "ink_9um@rectina-m4", "v8in@ink-8um-v8in",
               "v8in@pherc0306b-ahn-s0", "v8in@pherc0306b-ahn-s1", "v8in@pherc0306b-ahn-s2"}
     assert {c.profile_id for c in cells} == native
     assert len(skipped) == len(list_profiles()) - len(native)
