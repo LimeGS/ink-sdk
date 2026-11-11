@@ -26,6 +26,7 @@ def test_builtin_profiles_are_exact():
         "v8in@pherc0306b-ahn-s0",
         "v8in@pherc0306b-ahn-s1",
         "v8in@pherc0306b-ahn-s2",
+        "ink_9um@rectina-m4",
     }
     assert get_profile("hecate@9.6um").input.depth == 16
     assert get_profile("canonical_2um@r152-3ddec-v2-l5-epoch13").input.depth == 62

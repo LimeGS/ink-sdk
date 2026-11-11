@@ -52,6 +52,7 @@ checkpoint when explicitly invoked; inference never downloads weights.
 | `timesformer@gp-scroll1` | `scrollprize/timesformer_GP_scroll1` (MIT) | `61b81d31ddb93c89a2b3b00c66769d18bd96ccb2` |
 | `timesformer@large-scroll1` | `scrollprize/timesformer_large_scroll1_01122024` (MIT) | `7e8b37ce66b2497b4af1ad07ae3d7d8f5c5fa990` |
 | `timesformer@scroll5` | `scrollprize/timesformer_scroll5_27112024` (MIT) | `396d39b9a66cbd21c9cbe453c4540d9516707020` |
+| `ink_9um@rectina-m4` | `evilaliv3/rectina` (CC BY-NC 4.0; file `m4/ckpt_020000.pth`) | `2f9eaf043512be4f89d22a3d39804dc55e387585` |
 
 ## vc_render_tifxyz / volume-cartographer
 

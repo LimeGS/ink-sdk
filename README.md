@@ -87,6 +87,7 @@ runs the same checks as `ink-sdk doctor`.
 | `timesformer@large-scroll1` | 7.91 ± 0.1 µm | 26 | 2D | Large Scroll 1; experimental transfer |
 | `timesformer@scroll5` | 7.91 ± 0.1 µm | 26 | 2D | Scroll 1 pretrained, PHerc172 fine-tuned; experimental transfer |
 | `ink_9um@trace-v3b-step5000` | 9.362 ± 0.1 µm | 17 | 2D | TRACE v3B; VILLA; both directions; GitHub release |
+| `ink_9um@rectina-m4` | 9.362 ± 0.75 µm | 17 | 2D | Rectina m4; VILLA; both directions; standard lane, not the card's 7-start reader |
 | `v8in@ink-8um-v8in` | 8.64 ± 0.75 µm | 24 | 2D | v8-in (PHerc. 1447 first letters); both directions |
 | `v8in@pherc0306b-ahn-s0` / `-s1` / `-s2` | 8.64 ± 0.75 µm | 24 | 2D | A-hn seeds (PHerc. 0306B claim); both directions |
 
@@ -98,6 +99,13 @@ dense_native ([Nieuwlaar/ink9um-dense-native](https://huggingface.co/Nieuwlaar/i
 published as weights plus training config, not as the `.pth` VILLA loads. `ink-sdk fetch` downloads both pinned
 files and rebuilds the checkpoint with his recipe, which needs `torch` and `safetensors`. The pinned digest was
 produced with torch 2.10; another torch version may write different bytes, and `fetch` then says so.
+
+Rectina m4 ([evilaliv3/rectina](https://huggingface.co/evilaliv3/rectina/tree/main/m4), CC BY-NC 4.0, Giovanni
+Pellerano) is an ink_9um reader trained from scratch on 87 segments of 8 scrolls (0343P among them, not the rolled
+PHerc. 0343). Its card compares it with Reader v3 on 14 held-out and control units (mean AUC +0.0056, above on 10 of
+14) with the author's own reader: mean over seven 17-layer windows of a 23-layer stack, two views and four shifted
+lattices. `ink-sdk infer` runs it through the standard ink9um lane (one 17-layer window), so the card's numbers are
+not reproduced by a default run.
 
 ### The PHerc. 0306B rule: TRACE v3B × A-hn
 
