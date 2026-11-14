@@ -83,6 +83,11 @@ class RunContext:
     umbilicus: Path | None = None
     primary: str | None = None
     orient_report: dict[str, Any] | None = None  # from `ink-sdk orient`; used only when primary is None
+    scroll: str | None = None  # optional override for training-overlap lookup
+    segment: str | None = None  # optional override for training-overlap lookup
+    # training-overlap identifiers already resolved from the original input (set by the battery,
+    # so its cells do not re-read the paths of its temporary windows)
+    overlap_input: dict[str, Any] | None = None
 
     def say(self, message: str) -> None:
         if self.progress is not None:

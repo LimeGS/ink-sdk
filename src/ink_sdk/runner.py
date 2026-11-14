@@ -28,10 +28,20 @@ from .registry import get_adapter
 from .renderers.base import Renderer
 from .renderers.vc_render_tifxyz import VcRenderTifxyzRenderer
 from .resolver import inspect_plan, with_render_spec
+from .training_overlap import lookup_segment
 
 
 def _utc() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _training_overlap(profile: ModelProfile, segment: Segment, ctx: RunContext) -> dict[str, Any]:
+    """Metadata only: does not change maps, liveness or exit codes.
+
+    Called with the segment as given (before any render), so the flag is resolved from the
+    original input; a battery cell passes the identifiers it resolved before writing windows.
+    """
+    return lookup_segment(profile.id, segment, ctx)
 
 
 def _models_dir(ctx: RunContext) -> Path:
@@ -131,8 +141,10 @@ def infer(
     started = time.time()
     work = _workdir(ctx)
     ctx = dataclasses.replace(ctx, workdir=work)
+    overlap = _training_overlap(profile, segment, ctx)
     if ctx.dry_run:
         plan = inspect_plan(segment, profile, ctx)
+        plan["training_overlap"] = overlap
         return InkResult(maps={}, primary=profile.output.primary, volume=None, out_dir=None, receipt_path=None, receipt=plan)
 
     output = _prepare_out(Path(out_dir), ctx.overwrite) if out_dir is not None else None
@@ -260,7 +272,9 @@ def infer(
             "non_claims": [
                 "A probability map is not OCR and does not accept ink, text, letters or First Letters.",
                 "No scientific evaluation was performed by this SDK.",
+                "Training-overlap is a metadata flag, not a score or a verdict.",
             ],
+            "training_overlap": overlap,
         }
         if "forward" in maps and "reverse" in maps:
             receipt["reverse_summary"] = forward_reverse_asymmetry(
@@ -350,6 +364,7 @@ def render_segment(
 def inspect(segment: Segment, profile: ModelProfile, ctx: RunContext, *, adapter=None, renderer: Renderer | None = None) -> dict:
     current = with_render_spec(segment, profile, ctx)
     result = inspect_plan(current, profile, ctx)
+    result["training_overlap"] = _training_overlap(profile, segment, ctx)
     adapter_impl = adapter or get_adapter(profile)
     result["issues"] = [
         issue.__dict__ for issue in adapter_impl.check(current, profile, ctx)

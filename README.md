@@ -207,10 +207,34 @@ PHerc0139 w043 (see their model card).
 | `preview.tif` | Display preview of the primary map |
 | `ink_3d.zarr` | Hecate 3D output with `--output-3d` |
 | `render/` | Render `0` array and `RENDER_RECEIPT.json` when rendered |
-| `INK_SDK_RECEIPT.json` | Profile, checkpoint, scale, render, stats, liveness, environment |
+| `INK_SDK_RECEIPT.json` | Profile, checkpoint, scale, render, stats, liveness, environment, training-overlap flag |
 | `LANE_NOT_USABLE` | Present when the liveness gate refuses the lane |
 
 The receipt is the source of truth. A probability map is not evidence of ink, letters or a First Letter.
+
+The receipt (and each battery cell) also carries a `training_overlap` flag. It is metadata only: it does
+not change maps, liveness or exit codes.
+
+- `in-sample`: the segment is in the training list of this checkpoint (`seen_by: "checkpoint"`) or of a
+  model it was fine-tuned from (`seen_by: "base model"`, `inherited: true`). For example TRACE v3B on
+  PHerc0139 w043 is in-sample through its seed-42 base, and the receipt also lists that TRACE used w043
+  for checkpoint selection.
+- `held out`: only when the evidence establishes it for the whole lineage, with its `basis`: `stated`
+  (the author's card or training code) or `complete list` (not in a training list whose whole chain of
+  start weights is published and read).
+- `unknown`: everything else, including a segment that is not listed, a later segment timestamp, a
+  re-render of the same sheet, a gap in a partial training list, a segment used only for checkpoint
+  selection, and an ambiguous input (for example two different scroll names in the path).
+
+Each flag lists its `evidence` (which model in the lineage, training or checkpoint selection, and the
+source). The built-in table documents `ink_9um@scrollprize-seed42-step75000`,
+`ink_9um@scrollprize-seed43-step75000`, `ink_9um@dense-native-step016000` and `v8in@ink-8um-v8in`, from
+jo-tud's tables on [villa PR #2349](https://github.com/ScrollPrize/villa/pull/2349) and
+[ink-sdk #17](https://github.com/LimeGS/ink-sdk/issues/17), and records the lineage of TRACE v3B
+(fine-tuned from ink_9um seed 42) and the A-hn seeds (fine-tuned from v8-in). Other profiles are
+`unknown`. Scroll and segment names are resolved once from the original input (surface volume, mesh,
+CT); `--scroll` and `--segment` override them. The battery resolves them before it writes its depth
+windows, so a battery cell and a single `infer` on the same input report the same flag.
 
 ---
 
@@ -603,8 +627,8 @@ ink-sdk battery --surface-volume PATH --voxel-um UM [--profile ID ...] [--ensemb
 
 Useful `infer` flags: `--roi`, `--primary`, `--device`, `--amp`, `--resample-from-um`, `--normal`,
 `--umbilicus`, `--output-3d`, `--python`, `--villa`, `--renderer`, `--no-render-cache`, `--threads`,
-`--max-render-gb`, `--overwrite`, `--deterministic`, `--dry-run`, `--json`. Use `ink-sdk infer --help` for
-the complete list.
+`--max-render-gb`, `--overwrite`, `--deterministic`, `--dry-run`, `--json`, `--scroll`, `--segment`.
+Use `ink-sdk infer --help` for the complete list.
 
 | Variable | Purpose | Default |
 |---|---|---|
