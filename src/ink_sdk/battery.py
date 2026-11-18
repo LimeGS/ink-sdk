@@ -23,7 +23,6 @@ from __future__ import annotations
 import base64
 import dataclasses
 import html
-import json
 import struct
 import time
 import zlib
@@ -32,7 +31,7 @@ from typing import Any, Callable, Sequence
 
 import numpy as np
 
-from .contracts import RunContext, jsonable
+from .contracts import RunContext
 from .errors import InkSDKError
 from .io import open_volume_array, write_json, write_zarr
 from .prepare import plan_scale
