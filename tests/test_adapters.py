@@ -93,3 +93,33 @@ def test_hecate_adapter_with_fake_predict(tmp_path, monkeypatch):
     assert len(calls) == 2
     assert calls[0][3] is False and calls[1][3] is True
     assert raw.volume_attrs["spacing_um"] == [2.4, 2.4, 2.4]
+
+
+def test_hecate_bf16_accepts_an_indexed_cuda_device(tmp_path, monkeypatch):
+    _allow_checkpoint(monkeypatch, tmp_path)
+    profile = get_profile("hecate@2.4um")
+
+    class FakeModel:
+        patch_size = (64, 256, 256)
+        sampling_um = 2.4
+        divisor = 200.0
+        margin = 1
+
+        def eval(self):
+            pass
+
+    import ink_sdk._vendor.hecate as vendor_hecate
+    import ink_sdk.adapters.hecate as hecate_adapter
+
+    precisions = []
+
+    def fake_predict(model, volume, output, reverse=False, stride=None, batch_size=1, precision="fp32", three_d=False):
+        precisions.append(precision)
+
+    monkeypatch.setattr(vendor_hecate, "predict", fake_predict)
+    monkeypatch.setattr(hecate_adapter, "resolve_device", lambda requested, torch_module: "cuda:0")
+    adapter = HecateAdapter(model_factory=lambda ckpt, device: FakeModel())
+    ctx = RunContext(device="cuda:0", amp="bf16", models_dir=tmp_path, workdir=tmp_path / "work")
+    raw = adapter.run(_prepared(tmp_path, (64, 32, 32), 2.4), profile, ctx)
+    assert precisions and set(precisions) == {"bf16"}
+    assert raw.receipt["device"] == "cuda:0"

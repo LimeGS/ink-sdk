@@ -137,15 +137,18 @@ def _open_ct(ct: str | Path, level: str):
     text = str(ct)
     try:
         node = zarr.open(text, mode="r")
+        if not hasattr(node, "shape") and level in node:
+            node = node[level]
     except Exception as exc:
         hint = ""
         if "://" in text and isinstance(exc, ImportError):
             hint = "; install ink-sdk[remote] to read a CT over http(s)"
+        elif "vc-delta3d" in str(exc):
+            # The published *.vcd3d.zarr volumes; the codec has wheels for Python 3.12+ only.
+            hint = "; install ink-sdk[remote] (or pip install vc-delta3d, Python 3.12+) to read vc-delta3d volumes"
         raise ValidationError(f"cannot open CT {ct}: {exc}{hint}") from exc
     if hasattr(node, "shape"):
         return node
-    if level in node:
-        return node[level]
     raise ValidationError(f"CT {ct} has no array {level!r}")
 
 

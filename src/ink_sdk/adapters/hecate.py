@@ -85,7 +85,7 @@ class HecateAdapter(BaseAdapter):
         if precision in {"default", "fp32", "fp16"}:
             precision = "fp32"
         elif precision == "bf16":
-            if device_name != "cuda":
+            if not device_name.startswith("cuda"):
                 raise InkSDKError("Hecate bf16 requires CUDA; use --device cpu with fp32")
         else:
             raise ValidationError(

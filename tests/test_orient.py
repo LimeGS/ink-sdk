@@ -171,3 +171,25 @@ def test_remote_ct_without_http_backend_names_the_extra(monkeypatch):
     monkeypatch.setattr(zarr, "open", no_backend)
     with pytest.raises(ValidationError, match=r"ink-sdk\[remote\]"):
         _open_ct("https://example.org/ct.zarr", "0")
+
+
+def test_vcd3d_ct_without_codec_names_the_extra(monkeypatch):
+    from ink_sdk.errors import ValidationError
+    from ink_sdk.orient import _open_ct
+
+    message = "An implementation for codec 'vc-delta3d' is not available."
+
+    class Group(dict):
+        def __getitem__(self, key):
+            raise RuntimeError(message)
+
+    monkeypatch.setattr(zarr, "open", lambda *args, **kwargs: Group({"0": None}))
+    with pytest.raises(ValidationError, match=r"vc-delta3d.*ink-sdk\[remote\]"):
+        _open_ct("https://example.org/ct.vcd3d.zarr", "0")
+
+    def array_open(*args, **kwargs):
+        raise RuntimeError(message)
+
+    monkeypatch.setattr(zarr, "open", array_open)
+    with pytest.raises(ValidationError, match=r"ink-sdk\[remote\]"):
+        _open_ct("https://example.org/ct.vcd3d.zarr/0", "0")

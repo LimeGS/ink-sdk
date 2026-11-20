@@ -65,6 +65,36 @@ def _villa_python_path(ctx: RunContext) -> tuple[Path, Path]:
     return root, python_path
 
 
+def _device_args(
+    python_path: Path, module: str, requested: str | None, say=None
+) -> tuple[list[str], dict[str, str]]:
+    """Translate --device for upstream infer: (extra arguments, extra environment).
+
+    villa main's infer has --device (auto/cpu/mps/cuda); the pinned revision only
+    has --gpus and picks CUDA when it can, otherwise CPU.
+    """
+    value = (requested or "auto").lower()
+    if value == "auto":
+        return [], {}
+    if value.startswith("cuda:"):
+        return ["--gpus", value.split(":", 1)[1]], {}
+    source = python_path / (module.replace(".", "/") + ".py")
+    try:
+        has_device = '"--device"' in source.read_text(encoding="utf-8")
+    except OSError:
+        has_device = False
+    if has_device:
+        return ["--device", value], {}
+    if value == "cpu":
+        return [], {"CUDA_VISIBLE_DEVICES": ""}
+    if value != "cuda" and say:
+        say(
+            f"warning: {module} at this villa revision has no --device option and runs on CUDA "
+            f"or CPU only; --device {value} needs a villa checkout from main"
+        )
+    return [], {}
+
+
 def _read_map(path: Path) -> np.ndarray:
     if not path.is_file():
         raise InkSDKError(f"inference reported success but wrote no map: {path}")
@@ -176,7 +206,10 @@ class Ink9umAdapter(BaseAdapter):
             upstream_amp,
             "--no-compile",
         ]
+        device_args, device_env = _device_args(python_path, module, ctx.device, ctx.say)
+        command += device_args
         env = dict(os.environ)
+        env.update(device_env)
         env["PYTHONPATH"] = str(python_path) + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
         ctx.say(f"infer: {' '.join(command)}")
         completed = subprocess.run(

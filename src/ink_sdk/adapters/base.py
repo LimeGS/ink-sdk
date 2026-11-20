@@ -125,6 +125,11 @@ def require_torch() -> None:
         ) from exc
 
 
+def _mps_available(torch_module) -> bool:
+    mps = getattr(torch_module.backends, "mps", None)
+    return bool(mps is not None and mps.is_available())
+
+
 def resolve_device(requested: str | None, torch_module=None) -> str:
     if torch_module is None:
         import torch as torch_module  # type: ignore[no-redef]
@@ -132,10 +137,12 @@ def resolve_device(requested: str | None, torch_module=None) -> str:
     if value == "auto":
         if torch_module.cuda.is_available():
             return "cuda"
+        if _mps_available(torch_module):
+            return "mps"
         return "cpu"
     if value.startswith("cuda") and not torch_module.cuda.is_available():
         raise ValidationError("CUDA was requested but is not available")
-    if value == "mps" and not getattr(torch_module.backends, "mps", None):
+    if value == "mps" and not _mps_available(torch_module):
         raise ValidationError("MPS was requested but is not available")
     return value
 

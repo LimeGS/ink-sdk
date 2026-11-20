@@ -337,7 +337,7 @@ two-part mesh. Images are in render orientation. An ensemble image is a display,
 | `timesformer` | `torch>=2.6`, `safetensors`, `timesformer-pytorch==0.4.1` | GP, Large and Scroll5 |
 | `ink9um` | `torch`, `imagecodecs` | both 9 µm profiles |
 | `fetch` | `huggingface_hub` | `ink-sdk fetch` |
-| `remote` | `fsspec`, `aiohttp`, `requests` | `ink-sdk orient --ct` with an http(s) URL |
+| `remote` | `fsspec`, `aiohttp`, `requests`, `vc-delta3d` (Python 3.12+) | `ink-sdk orient --ct` with an http(s) URL or a published `*.vcd3d.zarr` volume |
 | `test` | `pytest`, `pytest-cov` | the test suite |
 
 The external `vc_render_tifxyz` binary is not installed by pip; see *Inputs* below.
@@ -575,6 +575,10 @@ Command-line options override the corresponding environment variables where the 
   make the map scientifically usable.
 - **CUDA requested but unavailable**: use `--device cpu`, or see the torch note under *Installation options*;
   9 µm is intended for CUDA and may be slow on CPU.
+- **`codec 'vc-delta3d' is not available`**: `orient --ct` on the published `*.vcd3d.zarr` volumes needs
+  `ink-sdk[remote]` (Python 3.12+).
+- **Apple silicon**: `--device auto` picks CUDA, then MPS, then CPU. The 9 µm lane passes `--device` to VILLA's
+  infer, which needs a VILLA checkout from main for `mps`.
 
 </details>
 

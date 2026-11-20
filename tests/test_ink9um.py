@@ -11,6 +11,7 @@ from ink_sdk.adapters.ink9um import (
     LEGACY_MODULE,
     MAIN_MODULE,
     Ink9umAdapter,
+    _device_args,
     _read_map,
     _villa_python_path,
     villa_entrypoint,
@@ -109,3 +110,59 @@ def _run_both_directions(tmp_path, monkeypatch, root, module):
     assert raw.receipt["villa_module"] == module
     assert "--amp-dtype" in infer_calls[0]
     assert "bf16" in infer_calls[0]
+
+
+def test_device_args_follow_what_upstream_infer_supports(tmp_path):
+    legacy = _villa(tmp_path / "legacy") / "ink-detection"
+    main = _villa_main(tmp_path / "main") / "vesuvius" / "src"
+    (main / "vesuvius" / "ink_detection" / "inference" / "infer.py").write_text(
+        'parser.add_argument("--device", choices=DEVICE_CHOICES, default="auto")\n'
+    )
+    assert _device_args(main, MAIN_MODULE, "auto") == ([], {})
+    assert _device_args(main, MAIN_MODULE, None) == ([], {})
+    assert _device_args(main, MAIN_MODULE, "mps") == (["--device", "mps"], {})
+    assert _device_args(main, MAIN_MODULE, "cpu") == (["--device", "cpu"], {})
+    assert _device_args(main, MAIN_MODULE, "cuda:1") == (["--gpus", "1"], {})
+    # The pinned revision has --gpus but no --device.
+    assert _device_args(legacy, LEGACY_MODULE, "cuda:1") == (["--gpus", "1"], {})
+    assert _device_args(legacy, LEGACY_MODULE, "cpu") == ([], {"CUDA_VISIBLE_DEVICES": ""})
+    assert _device_args(legacy, LEGACY_MODULE, "cuda") == ([], {})
+    # ...and no MPS path: warn and run as before rather than break existing commands.
+    said = []
+    assert _device_args(legacy, LEGACY_MODULE, "mps", said.append) == ([], {})
+    assert len(said) == 1 and "villa checkout from main" in said[0]
+
+
+def test_ink9um_passes_device_to_villa_main(tmp_path, monkeypatch):
+    root = _villa_main(tmp_path)
+    (root / "vesuvius" / "src" / "vesuvius" / "ink_detection" / "inference" / "infer.py").write_text(
+        'parser.add_argument("--device")\n'
+    )
+    profile = get_profile("ink_9um@scrollprize-seed43-step75000")
+    checkpoint = tmp_path / "step.pth"
+    checkpoint.write_bytes(b"fake")
+    monkeypatch.setattr(ModelProfile, "verify_checkpoint", lambda self, models: checkpoint)
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        if command[0] == "git":
+            return subprocess.CompletedProcess(command, 0, "abc123\n", "")
+        for name in ("ink.tif", "ink_reverse.tif"):
+            tifffile.imwrite(Path(command[5]).with_name(name), np.full((8, 8), 128, dtype=np.uint8))
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    prepared = PreparedInput(
+        path=tmp_path / "prepared.zarr",
+        array=np.full((17, 8, 8), 100, dtype=np.uint8),
+        pixel_um=(9.6, 9.6, 9.6),
+        source=tmp_path / "prepared.zarr",
+        scale_plan=ScalePlan(9.6, 9.6, "native"),
+        valid=np.ones((8, 8), dtype=bool),
+    )
+    ctx = RunContext(villa=root, workdir=tmp_path / "work", models_dir=tmp_path, device="mps")
+    raw = Ink9umAdapter().run(prepared, profile, ctx)
+    infer_call = next(c for c in calls if len(c) > 2 and c[2] == MAIN_MODULE)
+    assert infer_call[-2:] == ["--device", "mps"]
+    assert raw.receipt["command"][-2:] == ["--device", "mps"]
