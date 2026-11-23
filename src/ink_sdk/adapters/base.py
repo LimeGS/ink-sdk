@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import sys
 from typing import Protocol
 
 import numpy as np
@@ -17,6 +19,15 @@ from ..contracts import (
 from ..errors import MissingDependencyError, ValidationError
 from ..prepare import prepare_input
 from ..profiles import ModelProfile
+
+
+def model_python(ctx: RunContext | None) -> str:
+    """Interpreter that runs upstream model code: --python, then INK_SDK_PYTHON, then this one.
+
+    Upstream projects can need dependencies that cannot share ink-sdk's environment
+    (VILLA pins zarr 2; ink-sdk needs zarr 3), so they may live in their own.
+    """
+    return (ctx.python if ctx else None) or os.environ.get("INK_SDK_PYTHON") or sys.executable
 
 
 class Adapter(Protocol):

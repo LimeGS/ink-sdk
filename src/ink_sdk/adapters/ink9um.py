@@ -19,7 +19,7 @@ from ..contracts import Issue, PreparedInput, RawOutput, RunContext, Segment
 from ..errors import InkSDKError, MissingDependencyError
 from ..io import write_zarr
 from ..profiles import ModelProfile
-from .base import BaseAdapter, batch_size, source_scale_issue, stats
+from .base import BaseAdapter, batch_size, model_python, source_scale_issue, stats
 
 
 LEGACY_MODULE = "koine_machines.inference.infer"
@@ -98,21 +98,43 @@ def _device_args(
 LOADER_THREADS = 4
 
 
-def _loader_args(python_path: Path, module: str, platform: str | None = None) -> list[str]:
-    """Tile loaders for upstream infer: threads instead of worker processes on macOS.
+# DataLoader worker processes pass tiles through /dev/shm; Docker gives containers 64 MiB by default.
+MIN_SHARED_MEMORY = 1 << 30
+
+
+def _shared_memory_bytes(path: str = "/dev/shm") -> int:
+    try:
+        stats = os.statvfs(path)
+    except OSError:
+        return 0
+    return stats.f_frsize * stats.f_blocks
+
+
+def _loader_args(
+    python_path: Path, module: str, platform: str | None = None, shared_memory: int | None = None
+) -> list[str]:
+    """Tile loaders for upstream infer: no worker processes where they are slow or cannot run.
 
     On macOS upstream's spawned DataLoader workers each take seconds to start and, until ScrollPrize/villa#2608, about
     5 s to shut down after every direction: on a 1024 x 1024 PHerc0841 region the run took 62.8 s with the default
     four workers and 19.2 s with --loader-threads 4, with the same maps. Older revisions have no --loader-threads.
+    On Linux with little shared memory (a container's default 64 MiB) worker processes fail to hand over tiles, so
+    tiles load in threads, or in the main process where upstream has no --loader-threads.
     """
-    if (platform or sys.platform) != "darwin":
-        return []
+    platform = platform or sys.platform
     source = python_path / (module.replace(".", "/") + ".py")
     try:
-        has_threads = '"--loader-threads"' in source.read_text(encoding="utf-8")
+        text = source.read_text(encoding="utf-8")
     except OSError:
-        has_threads = False
-    return ["--num-workers", "0", "--loader-threads", str(LOADER_THREADS)] if has_threads else []
+        text = ""
+    has_threads = '"--loader-threads"' in text
+    if platform == "darwin":
+        return ["--num-workers", "0", "--loader-threads", str(LOADER_THREADS)] if has_threads else []
+    shared = _shared_memory_bytes() if shared_memory is None else shared_memory
+    if platform.startswith("linux") and shared < MIN_SHARED_MEMORY and '"--num-workers"' in text:
+        threads = ["--loader-threads", str(LOADER_THREADS)] if has_threads else []
+        return ["--num-workers", "0", *threads]
+    return []
 
 
 def _read_map(path: Path) -> np.ndarray:
@@ -203,7 +225,7 @@ class Ink9umAdapter(BaseAdapter):
         if reverse_output.exists():
             reverse_output.unlink()
 
-        interpreter = ctx.python or sys.executable
+        interpreter = model_python(ctx)
         amp = str(ctx.amp or profile.execution.amp)
         # Upstream names the fp32 path "default"; it has no "fp32" choice.
         upstream_amp = "default" if amp == "fp32" else amp
