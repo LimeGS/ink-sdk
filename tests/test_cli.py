@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+import click
+
 from typer.testing import CliRunner
 
 from ink_sdk.cli import app
@@ -106,4 +108,5 @@ def test_infer_passes_batch_to_the_run(monkeypatch, tmp_path, surface_volume):
     assert runner.invoke(app, args + ["--batch", "1"]).exit_code == 0
     result = runner.invoke(app, args + ["--batch", "0"])
     assert result.exit_code == 2  # usage error from the option's min=1, not a later failure
-    assert "--batch" in result.output
+    # Rich colours the usage error on CI (GITHUB_ACTIONS), splitting the option name with escape codes.
+    assert "--batch" in click.unstyle(result.output)

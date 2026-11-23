@@ -6,6 +6,7 @@ import json
 import threading
 from pathlib import Path
 
+import click
 import numpy as np
 import pytest
 import tifffile
@@ -161,4 +162,4 @@ def test_cli_ct_copy_reports_json_and_errors(tmp_path):
     assert result.exit_code == 0, result.output
     assert json.loads(result.stdout)["chunks"] == 8
     missing = runner.invoke(app, ["ct-copy", "--tifxyz", str(mesh), "--out", str(tmp_path / "x.zarr")])
-    assert missing.exit_code == 2 and "--source" in missing.output
+    assert missing.exit_code == 2 and "--source" in click.unstyle(missing.output)
