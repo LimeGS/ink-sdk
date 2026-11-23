@@ -14,7 +14,7 @@ import typer
 from .api import InkSDK
 from .contracts import RenderSpec, RunContext, jsonable
 from .errors import DegenerateMapError, InkSDKError
-from .registry import get_profile, list_profiles
+from .registry import get_profile as _get_profile, list_profiles
 from .resolver import build_segment
 
 app = typer.Typer(
@@ -101,6 +101,10 @@ def _guard(callable_):
         raise typer.Exit(2)
 
 
+def get_profile(identifier: str):
+    return _guard(lambda: _get_profile(identifier))
+
+
 def _build_sdk(renderer, models_dir, cache_dir, device, villa) -> InkSDK:
     return InkSDK(
         models_dir=models_dir,
@@ -125,7 +129,7 @@ def _build_segment(
 ):
     profile_obj = get_profile(profile)
     explicit = (float(pixel_um),) * 3 if pixel_um is not None else None
-    return build_segment(
+    return _guard(lambda: build_segment(
         profile=profile_obj,
         ctx=ctx,
         surface_volume=surface_volume,
@@ -134,7 +138,7 @@ def _build_segment(
         voxel_um=voxel_um,
         pixel_um=explicit,
         force_render=force_render,
-    )
+    ))
 
 
 @app.command("models")
@@ -292,7 +296,7 @@ def render(
     )
     sdk = _build_sdk(renderer, None, ctx.cache_dir, "cpu", None)
     profile_obj = get_profile(profile)
-    segment = build_segment(profile=profile_obj, ctx=ctx, tifxyz=tifxyz, ct=ct, voxel_um=voxel_um)
+    segment = _guard(lambda: build_segment(profile=profile_obj, ctx=ctx, tifxyz=tifxyz, ct=ct, voxel_um=voxel_um))
     segment = dataclasses.replace(
         segment,
         render=RenderSpec(
