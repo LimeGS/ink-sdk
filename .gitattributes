@@ -1,0 +1,2 @@
+# Vendored files are byte-identical to upstream and hash-verified.
+src/ink_sdk/_vendor/studio/*.py -text
