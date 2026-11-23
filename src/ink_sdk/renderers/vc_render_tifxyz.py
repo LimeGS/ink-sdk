@@ -11,6 +11,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from datetime import datetime, timezone
@@ -38,6 +39,13 @@ def _binary_parts(path: Path) -> tuple[list[str], Path]:
     path = Path(path)
     if path.name == "AppRun":
         return [str(path), "vc_render_tifxyz"], path
+    if os.name == "nt":
+        try:
+            with path.open("rb") as fh:
+                if fh.read(2) == b"#!":
+                    return [sys.executable, str(path)], path
+        except OSError:
+            pass
     return [str(path)], path
 
 
