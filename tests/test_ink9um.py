@@ -174,6 +174,88 @@ def test_loader_args_use_threads_on_macos_when_upstream_has_them(tmp_path):
     infer = main / "vesuvius" / "ink_detection" / "inference" / "infer.py"
     infer.write_text('parser.add_argument("--loader-threads", type=int, default=0)\n')
     assert _loader_args(main, MAIN_MODULE, "darwin") == ["--num-workers", "0", "--loader-threads", "4"]
-    assert _loader_args(main, MAIN_MODULE, "linux") == []
+    assert _loader_args(main, MAIN_MODULE, "linux", shared_memory=8 << 30) == []
     infer.write_text("parser.add_argument('--gpus')\n")
     assert _loader_args(main, MAIN_MODULE, "darwin") == []
+
+
+def test_loader_args_avoid_worker_processes_when_shared_memory_is_small(tmp_path):
+    # Docker gives containers 64 MiB of /dev/shm; DataLoader workers cannot hand tiles over in that.
+    main = _villa_main(tmp_path / "main") / "vesuvius" / "src"
+    infer = main / "vesuvius" / "ink_detection" / "inference" / "infer.py"
+    small, large = 64 << 20, 8 << 30
+    infer.write_text('parser.add_argument("--num-workers", type=int)\nparser.add_argument("--loader-threads", type=int)\n')
+    assert _loader_args(main, MAIN_MODULE, "linux", shared_memory=small) == ["--num-workers", "0", "--loader-threads", "4"]
+    assert _loader_args(main, MAIN_MODULE, "linux", shared_memory=large) == []
+    # The revision the 9 um profiles pin has --num-workers but no --loader-threads.
+    infer.write_text('parser.add_argument("--num-workers", "--workers", dest="num_workers", type=int, default=4)\n')
+    assert _loader_args(main, MAIN_MODULE, "linux", shared_memory=small) == ["--num-workers", "0"]
+    infer.write_text("parser.add_argument('--gpus')\n")
+    assert _loader_args(main, MAIN_MODULE, "linux", shared_memory=small) == []
+
+
+def test_model_python_prefers_flag_then_environment_then_this_interpreter(monkeypatch):
+    import sys
+
+    from ink_sdk.adapters.base import model_python
+
+    monkeypatch.delenv("INK_SDK_PYTHON", raising=False)
+    assert model_python(RunContext()) == sys.executable
+    assert model_python(None) == sys.executable
+    monkeypatch.setenv("INK_SDK_PYTHON", "/opt/villa/env/bin/python")
+    assert model_python(RunContext()) == "/opt/villa/env/bin/python"
+    assert model_python(RunContext(python="/flag/python")) == "/flag/python"
+
+
+def test_ink9um_runs_upstream_with_ink_sdk_python_from_environment(tmp_path, monkeypatch):
+    # VILLA needs zarr 2 and ink-sdk zarr 3, so VILLA's model code runs in its own environment.
+    monkeypatch.setenv("INK_SDK_PYTHON", "/opt/villa/env/bin/python")
+    profile = get_profile("ink_9um@scrollprize-seed43-step75000")
+    checkpoint = tmp_path / "step.pth"
+    checkpoint.write_bytes(b"fake")
+    monkeypatch.setattr(ModelProfile, "verify_checkpoint", lambda self, models: checkpoint)
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        if command[0] == "git":
+            return subprocess.CompletedProcess(command, 0, "abc123\n", "")
+        for name in ("ink.tif", "ink_reverse.tif"):
+            tifffile.imwrite(Path(command[5]).with_name(name), np.full((8, 8), 128, dtype=np.uint8))
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    prepared = PreparedInput(
+        path=tmp_path / "prepared.zarr",
+        array=np.full((17, 8, 8), 100, dtype=np.uint8),
+        pixel_um=(9.6, 9.6, 9.6),
+        source=tmp_path / "prepared.zarr",
+        scale_plan=ScalePlan(9.6, 9.6, "native"),
+        valid=np.ones((8, 8), dtype=bool),
+    )
+    ctx = RunContext(villa=_villa(tmp_path), workdir=tmp_path / "work", models_dir=tmp_path, device="cpu")
+    Ink9umAdapter().run(prepared, profile, ctx)
+    infer_call = next(c for c in calls if len(c) > 2 and c[2] == LEGACY_MODULE)
+    assert infer_call[0] == "/opt/villa/env/bin/python"
+
+
+def test_doctor_checks_villa_imports_with_the_model_interpreter(tmp_path, monkeypatch):
+    from ink_sdk import runner
+
+    root = _villa(tmp_path)
+    monkeypatch.setenv("INK_SDK_PYTHON", "/opt/villa/env/bin/python")
+    seen = []
+
+    def fake_run(command, **kwargs):
+        seen.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    result = runner.doctor(villa=root, models_dir=tmp_path)
+    checks = {check["name"]: check for check in result["checks"]}
+    assert checks["villa-import"]["ok"]
+    assert checks["model-python"]["detail"] == "/opt/villa/env/bin/python"
+    assert any(command[0] == "/opt/villa/env/bin/python" for command in seen)
+    seen.clear()
+    runner.doctor(villa=root, models_dir=tmp_path, python="/flag/python")
+    assert any(command[0] == "/flag/python" for command in seen)

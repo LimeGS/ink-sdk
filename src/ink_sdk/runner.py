@@ -365,6 +365,7 @@ def doctor(
     renderer: Path | None = None,
     models_dir: Path | None = None,
     villa: Path | None = None,
+    python: str | None = None,
 ) -> dict:
     checks: list[dict] = []
 
@@ -423,9 +424,12 @@ def doctor(
             found, module = entry
             env = dict(os.environ)
             env["PYTHONPATH"] = str(found) + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+            # Check the imports with the interpreter that will run the model (see model_python).
+            interpreter = python or os.environ.get("INK_SDK_PYTHON") or sys.executable
+            add("model-python", Path(interpreter).exists() or shutil.which(interpreter) is not None, interpreter, required=False)
             try:
                 imported = subprocess.run(
-                    [sys.executable, "-c", f"import {module}, vesuvius"],
+                    [interpreter, "-c", f"import {module}, vesuvius"],
                     capture_output=True,
                     text=True,
                     timeout=60,

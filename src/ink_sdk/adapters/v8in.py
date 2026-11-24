@@ -22,7 +22,14 @@ import tifffile
 from ..contracts import Issue, PreparedInput, RawOutput, RunContext, Segment
 from ..errors import InkSDKError, MissingDependencyError
 from ..profiles import ModelProfile
-from .base import BaseAdapter, batch_size, resolve_device, source_scale_issue, stats
+from .base import (
+    BaseAdapter,
+    batch_size,
+    model_python,
+    resolve_device,
+    source_scale_issue,
+    stats,
+)
 
 
 def _models_dir(ctx: RunContext | None) -> Path:
@@ -117,7 +124,7 @@ class V8inAdapter(BaseAdapter):
         # predict.py takes 00.tif, 01.tif, ... and uses the central 24 (same window as A-hn's layers 8..31 of 41).
         for i in range(layers):
             tifffile.imwrite(layer_dir / f"{i:02d}.tif", np.asarray(prepared.array[i]))
-        interpreter = ctx.python or sys.executable
+        interpreter = model_python(ctx)
         if os.sep in interpreter or (os.altsep and os.altsep in interpreter):
             interpreter = str(Path(interpreter).resolve())  # a path, so not looked up on PATH: make it absolute too
         device = _device(getattr(ctx, "device", None))

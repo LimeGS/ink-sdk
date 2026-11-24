@@ -51,6 +51,23 @@ ink-sdk infer \
 `ink-sdk fetch` is opt-in: inference never downloads weights. `ink-sdk doctor` marks each checkpoint
 `verified`, `missing` or `present-but-unverified`.
 
+### Docker
+
+The published CPU image (Linux x86-64) holds ink-sdk, VILLA at the revision the 9 µm profiles pin,
+in its own environment, and the official `vc_render_tifxyz` renderer, already configured. Mount your
+working directory at `/work` and a volume for the weights at `/models`:
+
+```bash
+ink() { docker run --rm -v "$PWD:/work" -v ink-sdk-models:/models ghcr.io/limegs/ink-sdk:cpu "$@"; }
+
+ink fetch --profile ink_9um@reader-v3
+ink ct-copy --tifxyz mesh --out ct.zarr          # only the CT the mesh needs
+ink infer --profile ink_9um@reader-v3 --tifxyz mesh --ct ct.zarr --out runs/reader-v3
+```
+
+`cpu` follows `main`; `<version>-cpu` and `sha-<commit>-cpu` identify one build. Paths are relative to
+`/work`. Build it yourself with `docker build -t ink-sdk:cpu .`.
+
 ## Use from Python
 
 The CLI is a thin layer over `ink_sdk.InkSDK`; everything it does is available from Python.
@@ -191,7 +208,8 @@ ink-sdk infer \
 Swap the profile ID for `ink_9um@reader-v2-step040000` to run reader-v2. The VILLA checkout must contain
 either `ink-detection/koine_machines/inference/infer.py` (the `merge-ink-pipelines` branch) or
 `vesuvius/src/vesuvius/ink_detection/inference/infer.py` (villa `main`, where the same CLI now lives), and make
-`vesuvius` importable. `imagecodecs` is required. The receipt records which module ran as `villa_module`.
+`vesuvius` importable. VILLA pins zarr 2 and ink-sdk needs zarr 3, so give VILLA its own environment and
+point `--python` (or `INK_SDK_PYTHON`) at its interpreter; the Docker image does this for you. `imagecodecs` is required. The receipt records which module ran as `villa_module`.
 The profiles were validated with the `merge-ink-pipelines` revision pinned in each profile. villa `main`'s
 `infer.py` was rewritten (new reader and normalization), so its maps may differ slightly from the validated ones.
 
@@ -372,8 +390,23 @@ ct.zarr/
 ```
 
 Only levels that exist may be announced in the multiscale metadata. Zarr v3 CT input is not supported;
-surface volumes may use v3. The SDK never downloads CT or surface volumes; only `ink-sdk fetch` uses the
-network, for weights.
+surface volumes may use v3. Rendering never downloads CT or surface volumes.
+
+A whole scan level can be terabytes, but a mesh only touches the chunks near its surface. `ink-sdk ct-copy`
+copies just those chunks from a remote (`https://`, public `s3://`) or local Zarr v2 array into a local
+group with the same shape, chunking and indices, so the mesh coordinates stay valid:
+
+```bash
+ink-sdk ct-copy --tifxyz mesh --out ct.zarr \
+  --source s3://vesuvius-challenge-open-data/PHercParis4/volumes/20260411134726-2.400um-0.2m-78keV-masked.zarr/2 \
+  --voxel-um 9.6
+ink-sdk infer --profile ink_9um@reader-v3 --tifxyz mesh --ct ct.zarr --out runs/reader-v3
+```
+
+For a winding-field-cli export, `--source` and `--voxel-um` default to the CT recorded in the mesh's
+`meta.json`. `--margin` (default 32 voxels) must cover half the render depth. Chunks are copied byte for
+byte, an interrupted copy resumes, and chunks that were not copied read as zero. For one 1024 × 1024 tile of
+PHerc. Paris 4 at 9.6 µm this is 111 chunks, about 0.2 GB, instead of a 1.3 TB level.
 
 The renderer is the official `vc_render_tifxyz` from volume-cartographer/VC3D, usually an AppImage `AppRun`.
 Pass `--renderer /path/to/AppRun` to `infer` or `render`, or set an environment variable:
@@ -532,7 +565,8 @@ If `out/` is not empty, inference refuses to overwrite it unless `--overwrite` i
 ```text
 ink-sdk models [--json]
 ink-sdk fetch [--profile ID|TOML ...] [--models-dir PATH] [--overwrite]
-ink-sdk doctor [--json] [--renderer PATH] [--models-dir PATH] [--villa PATH]
+ink-sdk doctor [--json] [--renderer PATH] [--models-dir PATH] [--villa PATH] [--python PATH]
+ink-sdk ct-copy --tifxyz MESH --out CT.zarr [--source URL|PATH] [--voxel-um UM] [--margin VOXELS]
 ink-sdk inspect --profile ID|TOML (--surface-volume PATH | --tifxyz MESH --ct CT)
 ink-sdk render --tifxyz MESH --ct CT [--profile ID|TOML] [--out PATH] [--dry-run]
 ink-sdk infer (--surface-volume PATH | --tifxyz MESH --ct CT) --profile ID|TOML ...
@@ -552,6 +586,7 @@ the complete list.
 | `INK_SDK_RENDERER` | `vc_render_tifxyz` path | unset |
 | `VC3D_APPRUN` | Alternative renderer path | unset |
 | `VILLA` | VILLA checkout for 9 µm | unset |
+| `INK_SDK_PYTHON` | Interpreter for upstream model code (VILLA's environment) when `--python` is not given | this interpreter |
 
 Command-line options override the corresponding environment variables where the command exposes them.
 
@@ -569,8 +604,8 @@ Command-line options override the corresponding environment variables where the 
 - **`unverified-orientation`**: add `--normal inward|outward` or `--umbilicus`.
 - **`missing-imagecodecs`**: install `ink-sdk[ink9um]`.
 - **`missing-villa` / no `vesuvius`**: set `VILLA` or pass `--villa`; check with
-  `ink-sdk doctor --villa "$VILLA"`. If VILLA has its own environment, `infer --python` points at it
-  (`doctor` checks the SDK's own interpreter).
+  `ink-sdk doctor --villa "$VILLA"`. If VILLA has its own environment, point `--python` or
+  `INK_SDK_PYTHON` at it; `doctor` checks VILLA's imports with that same interpreter.
 - **Checkpoint digest mismatch**: re-run `ink-sdk fetch` or point `--models-dir` at the verified copy.
 - **`DEGENERATE` / exit 3**: keep the receipt for diagnosis; `--on-degenerate warn` finishes but does not
   make the map scientifically usable.

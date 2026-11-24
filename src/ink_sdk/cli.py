@@ -13,6 +13,7 @@ import typer
 
 from .api import InkSDK
 from .contracts import RenderSpec, RunContext, jsonable
+from .ct_copy import DEFAULT_MARGIN, copy_ct_for_mesh
 from .errors import DegenerateMapError, InkSDKError
 from .registry import get_profile as _get_profile, list_profiles
 from .resolver import build_segment
@@ -197,9 +198,12 @@ def doctor(
     renderer: Optional[Path] = typer.Option(None, "--renderer"),
     models_dir: Optional[Path] = typer.Option(None, "--models-dir"),
     villa: Optional[Path] = typer.Option(None, "--villa"),
+    python: Optional[str] = typer.Option(
+        None, "--python", help="Interpreter for VILLA's model code (default: INK_SDK_PYTHON, then this one)."
+    ),
 ) -> None:
     """Check dependencies, renderer flags, VILLA and checkpoint presence."""
-    result = InkSDK().doctor(renderer=renderer, models_dir=models_dir, villa=villa)
+    result = InkSDK().doctor(renderer=renderer, models_dir=models_dir, villa=villa, python=python)
     if json_output:
         typer.echo(json.dumps(jsonable(result), indent=2, sort_keys=True))
         return
@@ -265,6 +269,40 @@ def inspect(
     )
     result = _guard(lambda: sdk.inspect(segment, profile, ctx=ctx))
     typer.echo(json.dumps(jsonable(result), indent=2, sort_keys=True))
+
+
+@app.command("ct-copy")
+def ct_copy(
+    tifxyz: Path = typer.Option(..., "--tifxyz", help="tifxyz mesh directory (x.tif, y.tif, z.tif)."),
+    out: Path = typer.Option(..., "--out", "-o", help="Local OME-Zarr to create or complete; pass it to --ct."),
+    source: Optional[str] = typer.Option(
+        None,
+        "--source",
+        help="Zarr v2 CT array the mesh coordinates index: http(s)://, public s3:// or a local path. "
+        "Default: the CT recorded in the mesh's meta.json (winding-field-cli exports).",
+    ),
+    voxel_um: Optional[float] = typer.Option(None, "--voxel-um", help="Voxel size to record; default from meta.json."),
+    margin: int = typer.Option(
+        DEFAULT_MARGIN, "--margin", help="Voxels copied around the surface; at least half the render depth."
+    ),
+    workers: int = typer.Option(16, "--workers", help="Parallel chunk downloads."),
+    json_output: bool = typer.Option(False, "--json"),
+) -> None:
+    """Copy only the CT chunks a mesh needs into a local OME-Zarr for --ct.
+
+    Keeps the source's shape, chunking and indices, so the mesh coordinates stay valid
+    and the copy is a drop-in for the full array; chunks far from the surface are not copied.
+    """
+    say = (lambda message: None) if json_output else (lambda message: typer.echo(message, err=True))
+    result = _guard(
+        lambda: copy_ct_for_mesh(
+            tifxyz, out, source=source, voxel_um=voxel_um, margin=margin, workers=workers, say=say
+        )
+    )
+    if json_output:
+        typer.echo(json.dumps(jsonable(result), indent=2, sort_keys=True))
+    else:
+        typer.echo(str(out))
 
 
 @app.command("render")
@@ -345,7 +383,9 @@ def infer(
     umbilicus: Optional[Path] = typer.Option(None, "--umbilicus"),
     renderer: Optional[Path] = typer.Option(None, "--renderer"),
     villa: Optional[Path] = typer.Option(None, "--villa"),
-    python: Optional[str] = typer.Option(None, "--python"),
+    python: Optional[str] = typer.Option(
+        None, "--python", help="Interpreter for upstream model code (default: INK_SDK_PYTHON, then this one)."
+    ),
     models_dir: Optional[Path] = typer.Option(None, "--models-dir"),
     cache_dir: Optional[Path] = typer.Option(None, "--cache-dir"),
     no_render_cache: bool = typer.Option(False, "--no-render-cache"),
@@ -449,7 +489,9 @@ def battery_cmd(
              "memory; the maps change only by float rounding."),
     device: str = typer.Option("auto", "--device"),
     villa: Optional[Path] = typer.Option(None, "--villa"),
-    python: Optional[str] = typer.Option(None, "--python"),
+    python: Optional[str] = typer.Option(
+        None, "--python", help="Interpreter for upstream model code (default: INK_SDK_PYTHON, then this one)."
+    ),
     models_dir: Optional[Path] = typer.Option(None, "--models-dir"),
     cache_dir: Optional[Path] = typer.Option(None, "--cache-dir"),
     thumb_px: int = typer.Option(360, "--thumb-px", help="Width of each mosaic tile."),
