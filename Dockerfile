@@ -1,4 +1,5 @@
-# ink-sdk with everything its mesh-to-ink-map path needs, CPU only, Linux x86-64:
+# ink-sdk with everything its mesh-to-ink-map path needs, Linux x86-64. TORCH_BACKEND selects the
+# PyTorch build of both environments: cu128 (CUDA 12.8, the default published image) or cpu.
 #   - ink-sdk and its optional extras (Python 3.12, zarr 3);
 #   - VILLA at the revision every 9 um profile pins, in its own environment (it pins zarr 2),
 #     found through VILLA and INK_SDK_PYTHON;
@@ -7,20 +8,18 @@
 # Any --user works: PyTorch's compile cache is set explicitly, so a UID with no passwd entry
 # never needs a username lookup.
 #
-#   docker build -t ink-sdk:cpu .
+#   docker build -t ink-sdk:cpu .                                      # CPU variant
+#   docker build -t ink-sdk:cuda --build-arg TORCH_BACKEND=cu128 .     # GPU (run with --gpus all)
 #   docker run --rm -v "$PWD:/work" -v ink-sdk-models:/models ink-sdk:cpu doctor
 
 ARG PYTHON_IMAGE=python:3.12.12-slim-bookworm@sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcade98e669c
 FROM ghcr.io/astral-sh/uv:0.9.17@sha256:5cb6b54d2bc3fe2eb9a8483db958a0b9eebf9edff68adedb369df8e7b98711a2 AS uv
-FROM ${PYTHON_IMAGE}
+FROM ${PYTHON_IMAGE} AS build
 
+ARG TORCH_BACKEND=cpu
 ARG VILLA_REVISION=3ea17f54a9b3d5fd1aaf73e1d2c8386dbaa9f30e
 ARG VC3D_URL=https://github.com/ScrollPrize/villa/releases/download/vc3d-archive-stable-363877681/VC3D-fc25b4d-2026-07-31-linux-x86_64.AppImage
 ARG VC3D_SHA256=5da27c3df44c0958390ea752b550756f9d7e2c104840a95c0ba8b8651c7aee9f
-LABEL org.opencontainers.image.source="https://github.com/LimeGS/ink-sdk" \
-      org.opencontainers.image.description="ink-sdk with VILLA and the vc_render_tifxyz renderer (CPU)" \
-      org.opencontainers.image.licenses="MIT"
-
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy UV_NO_CACHE=1 UV_PYTHON_DOWNLOADS=never
 
@@ -42,17 +41,33 @@ RUN git clone --quiet --filter=blob:none --no-checkout https://github.com/Scroll
     git -C /opt/villa sparse-checkout set vesuvius ink-detection && \
     git -C /opt/villa checkout --quiet "$VILLA_REVISION" && \
     uv venv /opt/villa/ink-detection/.venv --python /usr/local/bin/python3.12 && \
-    uv pip install --python /opt/villa/ink-detection/.venv/bin/python --torch-backend cpu \
+    uv pip install --python /opt/villa/ink-detection/.venv/bin/python --torch-backend "$TORCH_BACKEND" \
       -e /opt/villa/vesuvius -e /opt/villa/ink-detection && \
     /opt/villa/ink-detection/.venv/bin/python -c "import koine_machines.inference.infer, vesuvius"
 
 # ink-sdk itself.
 COPY pyproject.toml README.md LICENSE THIRD_PARTY_NOTICES.md /tmp/ink-sdk/
 COPY src /tmp/ink-sdk/src
+# It uses VILLA's exact PyTorch build, so the two environments hold identical PyTorch and CUDA
+# library files; hardlink then stores each of them once (several GB in the CUDA image).
 RUN uv venv /opt/ink-sdk --python /usr/local/bin/python3.12 && \
-    uv pip install --python /opt/ink-sdk/bin/python --torch-backend cpu "/tmp/ink-sdk[all]" && \
+    torch=$(/opt/villa/ink-detection/.venv/bin/python -c "import torch; print(torch.__version__)") && \
+    uv pip install --python /opt/ink-sdk/bin/python --torch-backend "$TORCH_BACKEND" \
+      "/tmp/ink-sdk[all]" "torch==$torch" && \
     rm -rf /tmp/ink-sdk && \
+    hardlink --ignore-time /opt/ink-sdk /opt/villa/ink-detection/.venv | tail -n 4
+
+# The shipped image: the runtime libraries and /opt (one copy keeps the hardlinks); no build tools.
+FROM ${PYTHON_IMAGE}
+LABEL org.opencontainers.image.source="https://github.com/LimeGS/ink-sdk" \
+      org.opencontainers.image.description="ink-sdk with VILLA and the vc_render_tifxyz renderer" \
+      org.opencontainers.image.licenses="MIT"
+# git: ink-sdk records the VILLA revision; the shared libraries the VC3D tools load.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates git libfontconfig1 libfreetype6 libglib2.0-0 libglx0 libgomp1 libopengl0 && \
+    rm -rf /var/lib/apt/lists/* && \
     mkdir -p /models /cache /work && chmod 1777 /models /cache /work
+COPY --from=build /opt /opt
 
 ENV PATH=/opt/ink-sdk/bin:$PATH \
     VILLA=/opt/villa \
@@ -61,6 +76,7 @@ ENV PATH=/opt/ink-sdk/bin:$PATH \
     INK_SDK_MODELS=/models \
     INK_SDK_CACHE=/cache \
     TORCHINDUCTOR_CACHE_DIR=/cache/torchinductor \
+    NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=compute,utility \
     HOME=/tmp
 WORKDIR /work
 ENTRYPOINT ["ink-sdk"]

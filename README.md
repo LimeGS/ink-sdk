@@ -53,24 +53,36 @@ ink-sdk infer \
 
 ### Docker
 
-The published CPU image (Linux x86-64) holds ink-sdk, VILLA at the revision the 9 µm profiles pin,
-in its own environment, and the official `vc_render_tifxyz` renderer, already configured. Mount your
-working directory at `/work` and a volume for the weights at `/models`:
+The published image (Linux x86-64) holds ink-sdk, VILLA at the revision the 9 µm profiles pin, in
+its own environment, and the official `vc_render_tifxyz` renderer, already configured. The default
+image has GPU support (CUDA 12.8). Mount your working directory at `/work` and a volume for the
+weights at `/models`:
 
 ```bash
-ink() { docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -v ink-sdk-models:/models \
-  ghcr.io/limegs/ink-sdk:cpu "$@"; }
+ink() { docker run --rm --gpus all --user "$(id -u):$(id -g)" -v "$PWD:/work" \
+  -v ink-sdk-models:/models ghcr.io/limegs/ink-sdk:latest "$@"; }
 
 ink fetch --profile ink_9um@reader-v3
 ink ct-copy --tifxyz mesh --out ct.zarr          # only the CT the mesh needs
 ink infer --profile ink_9um@reader-v3 --tifxyz mesh --ct ct.zarr --out runs/reader-v3
 ```
 
-Two cadences are published. Stable: `<version>-cpu` appears when the git tag `v<version>` is pushed
-and is never overwritten, and `cpu` is the latest release. Rolling: `edge-cpu` follows `main`, and
-`sha-<commit>-cpu` identifies one build. Paths are relative to
-`/work`, and `--user` writes the results as you rather than root; any UID works. Build it yourself
-with `docker build -t ink-sdk:cpu .`.
+Without an NVIDIA GPU (CI, quick checks, troubleshooting) use the CPU variant: the same tag with
+`-cpu`, without `--gpus all`.
+
+| Tag | Image | Cadence | Published when |
+| --- | --- | --- | --- |
+| `<version>` | CUDA | Stable | the git tag `v<version>` is pushed; never overwritten |
+| `latest` | CUDA | Stable | moves to each new release |
+| `<version>-cpu` | CPU | Stable | the same tag push; never overwritten |
+| `cpu` | CPU | Stable | moves to each new release |
+| `edge-cpu` | CPU | Rolling | every push to `main` whose image passes its checks |
+| `sha-<commit>-cpu` | CPU | Rolling | the same pushes; one exact build |
+
+The CUDA image is built and checked on a GPU only for releases, so there is no rolling GPU image.
+Paths are relative to `/work`, and `--user` writes the results as you rather than root; any UID
+works. Build it yourself with `docker build -t ink-sdk:cpu .`, or add
+`--build-arg TORCH_BACKEND=cu128` for the GPU image.
 
 ## Use from Python
 

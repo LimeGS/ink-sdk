@@ -111,8 +111,9 @@ jobs:
           cache-from: type=gha,scope=ink-sdk-cpu
 
   release:
-    # Stable: pushing the git tag vX.Y.Z promotes the image main checked and published for that
-    # exact commit to X.Y.Z-cpu and cpu. Nothing is rebuilt; a release is never overwritten.
+    # Stable, CPU variant: pushing the git tag vX.Y.Z promotes the image main checked and
+    # published for that exact commit to X.Y.Z-cpu and cpu. Nothing is rebuilt; a release is never
+    # overwritten. The default (CUDA) image of the release comes from release-cuda.
     if: github.event_name == 'push' && github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -143,3 +144,65 @@ jobs:
             echo "::error::$version-cpu is already published with other contents; releases are never overwritten"; exit 1
           fi
           docker buildx imagetools create --tag "$image:$version-cpu" --tag "$image:cpu" "$source"
+
+  release-cuda:
+    # Stable, default image: the CUDA build, published as X.Y.Z and latest. It is built and
+    # checked on the GPU runner (real CUDA operations in both environments), only for releases.
+    needs: release
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: [self-hosted, linux, x64, nvidia]
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Refuse to overwrite a published release
+        run: |
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ink-sdk"
+          if docker buildx imagetools inspect "$image:$version" > /dev/null 2>&1; then
+            echo "::error::$image:$version is already published; releases are never overwritten"; exit 1
+          fi
+      - name: Build the CUDA image
+        run: docker build --build-arg TORCH_BACKEND=cu128 -t ink-sdk:cuda .
+      - name: The image's tools, and both PyTorch builds, without a GPU
+        run: |
+          docker run --rm ink-sdk:cuda doctor --json > doctor.json
+          python3 - <<'PY'
+          import json
+          checks = {c["name"]: c for c in json.load(open("doctor.json"))["checks"]}
+          for name in ("renderer", "renderer-help", "villa", "villa-import", "model-python"):
+              assert checks[name]["ok"], (name, checks[name])
+          PY
+          for py in python /opt/villa/ink-detection/.venv/bin/python; do
+            docker run --rm --user 12345:12345 --entrypoint "$py" ink-sdk:cuda \
+              -c "import torch, torch._dynamo; assert torch.version.cuda, torch.__version__"
+          done
+      - name: Real GPU operations in both environments
+        run: |
+          for py in python /opt/villa/ink-detection/.venv/bin/python; do
+            docker run --rm --gpus 'device=0' --user 12345:12345 --entrypoint "$py" ink-sdk:cuda -c "
+          import torch
+          assert torch.cuda.is_available(), 'CUDA is not available in the container'
+          x = torch.ones(1, 1, 64, 64, device='cuda')
+          y = torch.nn.functional.conv2d(x, torch.ones(1, 1, 3, 3, device='cuda'))
+          assert float(y.max()) == 9.0
+          print(torch.__version__, torch.cuda.get_device_name(0))"
+          done
+          docker run --rm --gpus 'device=0' ink-sdk:cuda doctor --json > doctor-gpu.json
+          python3 -c 'import json; c = {x["name"]: x for x in json.load(open("doctor-gpu.json"))["checks"]}; assert c["cuda"]["ok"], c["cuda"]'
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish ghcr.io/<owner>/ink-sdk (default tags)
+        run: |
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/ink-sdk"
+          for tag in "$version" latest; do
+            docker tag ink-sdk:cuda "$image:$tag"
+            docker push "$image:$tag"
+          done
