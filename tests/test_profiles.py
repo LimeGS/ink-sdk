@@ -28,6 +28,9 @@ def test_builtin_profiles_are_exact():
         "v8in@pherc0306b-ahn-s2",
         "ink_9um@rectina-m4",
         "studio@softloss-20261023",
+        "ink_9um@jeff-0846a-sub8",
+        "studio@jeff-0846a-sub8",
+        "v8in@jeff-0846a-sub8",
         "ink_9um@argus-v2",
         "ink_9um@argus-v3",
     }

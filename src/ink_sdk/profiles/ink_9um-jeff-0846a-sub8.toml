@@ -1,0 +1,44 @@
+schema = "ink-sdk.profile.v1"
+id = "ink_9um@jeff-0846a-sub8"
+adapter = "ink9um"
+family = "surface-volume-2d"
+# Reader V3 fine-tuned by jeff for PHerc. 0846A (1000 steps, 10 native 9.36 um scrolls, 0846A weighted 4x). Weights shared by jeff on Discord (0846A Submission 8); released by him under MIT on 24 Nov 2026 (original upload https://drive.google.com/drive/folders/14tR9vMajXzrcJZ-MtqtSZsRlf2shdZ61).
+
+[source]
+repo = "pscamillo/jeff-0846a-submission-8"
+revision = "7fe23e6968ef28292b7bfd9e25837872e299c451"
+upstream = "domenicor046/reader-v3"
+upstream_revision = "aee1d64bced4eb35546348f3d276b9e2a0b99c46"
+url = "https://huggingface.co/pscamillo/jeff-0846a-submission-8"
+license = "MIT (jeff's fine-tune); base MIT"
+
+[checkpoint]
+path = "jeff-0846a-sub8/readerv3_001000.pth"
+upstream_path = "readerv3_001000.pth"
+sha256 = "7b78270ef9a64fd2179f53a38cd3c507f71e79212e5641353a0b76cef71ec1e9"
+bytes = 276660279
+
+[input]
+kind = "surface-volume"
+family = "surface-volume-2d"
+# The model card names "the native 9.36 um and 8.64 um scans", so the tolerance covers 8.64 natively
+# (8.61-10.11 um). Reader v2 keeps 9.6 +/- 0.5 and still needs --resample-from-um at 8.64.
+scale_um = 9.362
+scale_tolerance_um = 0.75
+depth = 17
+normalization = "from-checkpoint"
+# Checkpoint config: patch_size [17, 384, 384] (v2 continued on 256 px, then 384 px tiles).
+tile = 384
+overlap = 0.5
+
+[execution]
+direction = "both"
+blend = "hann"
+batch = 1
+amp = "bf16"
+
+[output]
+primary = "forward"
+# Declared by the model author (KLAVIS / domenicor046): trained with label smoothing 0.5.
+no_ink_floor = 0.5
+floor_provenance = "author"

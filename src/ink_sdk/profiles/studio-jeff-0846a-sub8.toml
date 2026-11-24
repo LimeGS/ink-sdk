@@ -1,0 +1,48 @@
+schema = "ink-sdk.profile.v1"
+id = "studio@jeff-0846a-sub8"
+adapter = "studio"
+family = "surface-volume-3d2d"
+# Studio fine-tuned by jeff for PHerc. 0846A (step 500). Weights shared by jeff on Discord (0846A Submission 8); released by him under MIT on 24 Nov 2026 (original upload https://drive.google.com/drive/folders/14tR9vMajXzrcJZ-MtqtSZsRlf2shdZ61).
+
+[source]
+repo = "pscamillo/jeff-0846a-submission-8"
+revision = "7fe23e6968ef28292b7bfd9e25837872e299c451"
+upstream = "priyankaranke/vesuvius-studio-multiscroll-cpt"
+upstream_revision = "235e3be8a06749344862c89a1e52c81d90b15e0e"
+url = "https://huggingface.co/pscamillo/jeff-0846a-submission-8"
+license = "MIT (jeff's fine-tune); base weights CC BY-NC 4.0, code MIT"
+
+[checkpoint]
+path = "jeff-0846a-sub8/studio_000500.safetensors"
+upstream_path = "studio_000500.safetensors"
+sha256 = "de0740c29051015002f9797b71bf5e976dceb737ad2727869e85953396f71c05"
+bytes = 893443724
+
+[input]
+kind = "surface-volume"
+family = "surface-volume-3d2d"
+# Trained on native 9.362 um and 8.64 um scans (PHerc0814/0841/0009B plus twelve other scroll groups).
+scale_um = 9.362
+scale_tolerance_um = 0.75
+depth = 16
+normalization = "clip-200-divide-255"
+clip = 200.0
+divisor = 255.0
+tile = 128
+overlap = 0.5
+# 64 + Hann is the tiling of the 0211 submission and of upstream's infer.sh. Upstream's library default (96, no
+# blend) writes each 96 px tile edge to edge and leaves a visible tile grid on the map.
+stride = 64
+
+[execution]
+direction = "both"
+blend = "hann"
+batch = 8
+amp = "bf16"
+
+[output]
+# Upstream's recipe stacks the planes deepest first for a vc_render_tifxyz render.
+# jeff fine-tuned on the forward depth order (confirmed by him), unlike upstream Studio.
+primary = "forward"
+no_ink_floor = 0.0
+floor_provenance = "not-declared"
