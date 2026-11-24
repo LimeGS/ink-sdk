@@ -66,7 +66,9 @@ ink ct-copy --tifxyz mesh --out ct.zarr          # only the CT the mesh needs
 ink infer --profile ink_9um@reader-v3 --tifxyz mesh --ct ct.zarr --out runs/reader-v3
 ```
 
-`cpu` follows `main`; `<version>-cpu` and `sha-<commit>-cpu` identify one build. Paths are relative to
+Two cadences are published. Stable: `<version>-cpu` appears when the git tag `v<version>` is pushed
+and is never overwritten, and `cpu` is the latest release. Rolling: `edge-cpu` follows `main`, and
+`sha-<commit>-cpu` identifies one build. Paths are relative to
 `/work`, and `--user` writes the results as you rather than root; any UID works. Build it yourself
 with `docker build -t ink-sdk:cpu .`.
 
