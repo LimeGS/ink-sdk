@@ -63,6 +63,11 @@ jobs:
             -c "import ink_sdk, zarr; assert zarr.__version__.startswith('3')"
           docker run --rm --entrypoint /opt/villa/ink-detection/.venv/bin/python ink-sdk:cpu \
             -c "import koine_machines.inference.infer, zarr; assert zarr.__version__.startswith('2')"
+          # Readers run as their own UID, which has no passwd entry in the image; importing
+          # torch._dynamo (as torchvision does) must not need a username.
+          docker run --rm --user 12345:12345 --entrypoint python ink-sdk:cpu -c "import torch._dynamo"
+          docker run --rm --user 12345:12345 --entrypoint /opt/villa/ink-detection/.venv/bin/python \
+            ink-sdk:cpu -c "import torch._dynamo, torchvision.ops"
 
   publish:
     # Pushes to main publish the image the image job just built and checked.

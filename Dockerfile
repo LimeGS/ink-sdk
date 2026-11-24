@@ -4,6 +4,8 @@
 #     found through VILLA and INK_SDK_PYTHON;
 #   - the official vc_render_tifxyz renderer from the VC3D AppImage, through INK_SDK_RENDERER.
 # Model weights are not included: `ink-sdk fetch` stores them in /models (mount a volume there).
+# Any --user works: PyTorch's compile cache is set explicitly, so a UID with no passwd entry
+# never needs a username lookup.
 #
 #   docker build -t ink-sdk:cpu .
 #   docker run --rm -v "$PWD:/work" -v ink-sdk-models:/models ink-sdk:cpu doctor
@@ -58,6 +60,7 @@ ENV PATH=/opt/ink-sdk/bin:$PATH \
     INK_SDK_RENDERER=/opt/vc3d/AppRun \
     INK_SDK_MODELS=/models \
     INK_SDK_CACHE=/cache \
+    TORCHINDUCTOR_CACHE_DIR=/cache/torchinductor \
     HOME=/tmp
 WORKDIR /work
 ENTRYPOINT ["ink-sdk"]

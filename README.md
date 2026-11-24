@@ -58,7 +58,8 @@ in its own environment, and the official `vc_render_tifxyz` renderer, already co
 working directory at `/work` and a volume for the weights at `/models`:
 
 ```bash
-ink() { docker run --rm -v "$PWD:/work" -v ink-sdk-models:/models ghcr.io/limegs/ink-sdk:cpu "$@"; }
+ink() { docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" -v ink-sdk-models:/models \
+  ghcr.io/limegs/ink-sdk:cpu "$@"; }
 
 ink fetch --profile ink_9um@reader-v3
 ink ct-copy --tifxyz mesh --out ct.zarr          # only the CT the mesh needs
@@ -66,7 +67,8 @@ ink infer --profile ink_9um@reader-v3 --tifxyz mesh --ct ct.zarr --out runs/read
 ```
 
 `cpu` follows `main`; `<version>-cpu` and `sha-<commit>-cpu` identify one build. Paths are relative to
-`/work`. Build it yourself with `docker build -t ink-sdk:cpu .`.
+`/work`, and `--user` writes the results as you rather than root; any UID works. Build it yourself
+with `docker build -t ink-sdk:cpu .`.
 
 ## Use from Python
 
