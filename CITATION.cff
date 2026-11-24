@@ -7,7 +7,7 @@ authors:
   - name: LimeGS
 repository-code: https://github.com/LimeGS/ink-sdk
 license: MIT
-version: "0.1.0"
+version: "0.1.1"
 keywords:
   - herculaneum-scrolls
   - ink-detection

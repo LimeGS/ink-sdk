@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ink-sdk"
-version = "0.1.0"
+version = "0.1.1"
 description = "Standalone inference SDK for Vesuvius ink detection"
 readme = "README.md"
 requires-python = ">=3.11"
