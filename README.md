@@ -158,6 +158,15 @@ default (stride 96, no blending) leaves a visible tile grid. The primary map is 
 which is upstream's order for a `vc_render_tifxyz` render. `ink-sdk fetch --profile studio@softloss-20261023`
 downloads the 893 MB weights from the release; inference needs `torch` and `safetensors` (`ink-sdk[studio]`).
 
+jeff's PHerc. 0846A Submission 8 models (Discord `jeffchen`; released by him under MIT, with studio and v8in keeping their bases' CC BY-NC 4.0) are fine-tunes of three models above: Reader V3 (1000 steps on ten native 9.36 µm scrolls, PHerc. 0846A weighted 4x), Studio and v8-in. They are hosted with his permission at [pscamillo/jeff-0846a-submission-8](https://huggingface.co/pscamillo/jeff-0846a-submission-8), whose card links his original upload. His Studio was fine-tuned on the forward depth order, so `studio@jeff-0846a-sub8` reads `forward`, unlike upstream Studio. His claim map is the product of the studio and reader runs; on a PHercParis4 crop (2.4 µm surface volume pooled 4x) both read Greek and the product is the cleanest:
+
+```sh
+ink-sdk fetch --profile ink_9um@jeff-0846a-sub8 --profile studio@jeff-0846a-sub8
+ink-sdk infer -p ink_9um@jeff-0846a-sub8 --surface-volume sv.zarr --voxel-um 9.362 --villa ~/villa --out runs/reader
+ink-sdk infer -p studio@jeff-0846a-sub8 --surface-volume sv.zarr --voxel-um 9.362 --out runs/studio
+ink-sdk combine runs/studio runs/reader --mode product --side forward --out runs/claim
+```
+
 ### The PHerc. 0306B rule: TRACE v3B × A-hn
 
 Liam Warner and Nicola Bodill's First Letters result on PHerc. 0306B multiplies two ink maps pixel by pixel, so a
