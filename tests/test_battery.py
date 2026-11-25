@@ -29,7 +29,8 @@ def test_plan_without_resample_runs_only_native_8_64_profiles():
     # (TRACE v3B is pinned at 9.362 +- 0.1 um, as its authors advise).
     native = {"ink_9um@reader-v3", "ink_9um@dense-native-step016000", "ink_9um@rectina-m4", "v8in@ink-8um-v8in",
               "v8in@pherc0306b-ahn-s0", "v8in@pherc0306b-ahn-s1", "v8in@pherc0306b-ahn-s2",
-              "studio@softloss-20261023", "ink_9um@argus-v2", "ink_9um@argus-v3"}
+              "studio@softloss-20261023", "ink_9um@argus-v2", "ink_9um@argus-v3",
+              "ink_9um@jeff-0846a-sub8", "studio@jeff-0846a-sub8", "v8in@jeff-0846a-sub8"}
     assert {c.profile_id for c in cells} == native
     assert len(skipped) == len(list_profiles()) - len(native)
 

@@ -129,6 +129,9 @@ runs the same checks as `ink-sdk doctor`.
 | `v8in@ink-8um-v8in` | 8.64 ± 0.75 µm | 24 | 2D | v8-in (PHerc. 1447 first letters); both directions |
 | `v8in@pherc0306b-ahn-s0` / `-s1` / `-s2` | 8.64 ± 0.75 µm | 24 | 2D | A-hn seeds (PHerc. 0306B claim); both directions |
 | `studio@softloss-20261023` | 9.362 ± 0.75 µm | 16 | 2D | Studio (PHerc. 0211 submission model); both directions; stride 64 + Hann; GitHub release |
+| `ink_9um@jeff-0846a-sub8` | 9.362 ± 0.75 µm | 17 | 2D | jeff's PHerc. 0846A Submission 8: Reader V3 fine-tune (0846A weighted 4x); VILLA; both directions |
+| `studio@jeff-0846a-sub8` | 9.362 ± 0.75 µm | 16 | 2D | jeff's 0846A Submission 8: Studio fine-tune on the forward depth order; stride 64 + Hann; his claim map is `combine --mode product` with the reader |
+| `v8in@jeff-0846a-sub8` | 8.64 ± 0.75 µm | 24 | 2D | jeff's 0846A Submission 8: v8-in fine-tune; needs the v8-in code like A-hn |
 
 `ink-sdk models` lists them; `ink-sdk models --json` also shows checkpoint paths and SHA-256 values.
 
