@@ -518,6 +518,10 @@ def battery_cmd(
         ensemble=ensemble, say=typer.echo))
     if dry_run:
         typer.echo(json.dumps(jsonable(report), indent=2, sort_keys=True))
+    elif report.get("failed"):
+        typer.echo(f"error: {len(report['failed'])} of {len(report['cells'])} battery cells failed; "
+                   f"see {out / 'BATTERY.json'}", err=True)
+        raise typer.Exit(2)
 
 
 if __name__ == "__main__":

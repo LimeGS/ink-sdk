@@ -92,3 +92,41 @@ def test_battery_page_renders_summary_failures_and_escapes(tmp_path):
     assert "FAILED" in page and "ALIVE" in page and "not OCR" in page
     assert 'href="#ensemble"' in page and 'src="ensemble/step1/b.png"' in page
     assert "reading side · reverse" in page and "blind side · forward" in page
+
+
+def test_failed_cells_are_reported_and_the_cli_exits_2(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from typer.testing import CliRunner
+
+    import ink_sdk.battery as battery
+    from ink_sdk.cli import app
+    from ink_sdk.contracts import RunContext
+    from ink_sdk.errors import ValidationError
+
+    class HalfSDK:
+        def infer(self, segment, profile, out_dir, ctx):
+            if profile.adapter == "v8in":
+                raise ValidationError("the v8-in lane needs predict.py\nsecond line")
+            return SimpleNamespace(primary="forward", receipt={})
+
+    volume = tmp_path / "sv.npy"
+    np.save(volume, np.full((28, 32, 32), 100, dtype=np.uint8))
+    profiles = [get_profile("studio@softloss-20261023"), get_profile("v8in@ink-8um-v8in")]
+    lines = []
+    report = battery.run_battery(HalfSDK(), volume, 9.366, profiles, tmp_path / "out", RunContext(device="cpu"),
+                                 centres=(0,), steps=(1,), thresholds=(0.5,), thumb_px=16, say=lines.append)
+    assert [c["ok"] for c in report["cells"]] == [True, False]
+    assert report["skipped"] == []
+    assert report["failed"] == [{"profile": "v8in@ink-8um-v8in", "centre": 0, "step": 1,
+                                 "reason": "ValidationError: the v8-in lane needs predict.py\nsecond line"}]
+    assert "[2/2] v8in@ink-8um-v8in c+0_s1 FAILED: ValidationError: the v8-in lane needs predict.py" in lines
+    assert any(line.startswith("battery: 1 of 2 cells failed (v8in@ink-8um-v8in)") for line in lines)
+
+    monkeypatch.setattr(battery, "run_battery", lambda *a, **k: report)
+    result = CliRunner().invoke(app, ["battery", "--surface-volume", str(volume), "--voxel-um", "9.366",
+                                      "--out", str(tmp_path / "out")])
+    assert result.exit_code == 2 and "1 of 2 battery cells failed" in result.output
+    report["failed"] = []
+    assert CliRunner().invoke(app, ["battery", "--surface-volume", str(volume), "--voxel-um", "9.366",
+                                    "--out", str(tmp_path / "out")]).exit_code == 0

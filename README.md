@@ -583,6 +583,7 @@ The gate checks the primary map:
 
 `--on-degenerate fail` (default) exits 3 and keeps the map and receipt. `--on-degenerate warn` continues and
 exits 0. Exit codes: `0` success, `2` validation/dependency/render error, `3` refused degenerate lane.
+`battery` writes all its outputs, then exits 2 if any cell failed; `BATTERY.json` lists those cells under `failed`.
 If `out/` is not empty, inference refuses to overwrite it unless `--overwrite` is passed.
 
 </details>

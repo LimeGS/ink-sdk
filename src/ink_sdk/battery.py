@@ -11,6 +11,7 @@ Outputs (``OUT``):
   mosaic_<bg>_t<thr>.png                 rows = profile x step, columns = centre; bg = ct | black
   stability_t<thr>.png                   fraction of all cells where the map is >= thr (what holds across settings)
   index.html, BATTERY.json               everything above, plus every skipped profile or failed cell and why
+                                         (``skipped``: not run by the plan; ``failed``: ran and raised)
   ensemble/step<s>/                      with ``ensemble``: z-score ensemble per centre, reading and blind side
                                          (see ensemble.py; after Erwin Nieuwlaar's PHerc0343 recipe)
 
@@ -174,11 +175,18 @@ def run_battery(
             if len(message) > 2000:
                 message = message[:300] + " [...] " + message[-1700:]
             row.update(ok=False, error=message)
+            say(f"[{i}/{len(cells)}] {p.id} {tag} FAILED: {message.splitlines()[0][:300]}")
         results.append(row)
 
+    failed = [{"profile": r["profile"], "centre": r["centre"], "step": r["step"], "reason": r["error"]}
+              for r in results if not r.get("ok")]
+    if failed:
+        names = ", ".join(sorted({f["profile"] for f in failed}))
+        say(f"battery: {len(failed)} of {len(results)} cells failed ({names}); "
+            "the mosaics, stability map and ensemble leave them out")
     report = {"schema": "ink-sdk.battery.v1", "surface_volume": str(surface_volume), "pixel_um": pixel_um,
               "layers": n, "centres": list(centres), "steps": list(steps), "thresholds": list(thresholds),
-              "resample_from_um": resample_from_um, "cells": results, "skipped": skipped,
+              "resample_from_um": resample_from_um, "cells": results, "skipped": skipped, "failed": failed,
               "runtime_seconds": round(time.time() - started, 1),
               "non_claims": ["A probability map is not OCR and does not accept ink, text or letters.",
                              "The battery shows every cell; it does not select a best one."]}
