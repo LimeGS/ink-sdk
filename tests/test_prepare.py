@@ -112,3 +112,36 @@ def test_source_identity_ignores_a_file_it_cannot_stat_but_still_sees_rewrites(t
     assert len(before) == 3  # not the bare-path fallback
     (source / "0" / "0.0.0").write_bytes(b"b" * 9)
     assert _source_identity(source) != before
+
+
+def test_an_interrupted_prepare_is_redone_not_read_back_as_zeros(tmp_path, monkeypatch):
+    import pytest
+    import zarr
+
+    import ink_sdk.prepare as prepare_module
+
+    path = tmp_path / "vol.zarr"
+    group = zarr.open_group(str(path), mode="w", zarr_format=2)
+    group.create_array("0", shape=(8, 8, 8), dtype="u1", chunks=(4, 4, 4))
+    group["0"][:] = 9
+    group.attrs["pixel_um"] = [2.4, 2.4, 2.4]
+    profile = get_profile("hecate@9.6um")
+    real = prepare_module.write_zarr
+
+    class CutOff:
+        def __init__(self, volume):
+            self.shape, self.dtype, self.ndim = volume.shape, volume.dtype, volume.ndim
+
+        def __getitem__(self, key):
+            raise RuntimeError("interrupted")
+
+        def __array__(self, *args, **kwargs):
+            raise RuntimeError("interrupted")
+
+    monkeypatch.setattr(prepare_module, "write_zarr", lambda p, volume, **kw: real(p, CutOff(volume), **kw))
+    with pytest.raises(RuntimeError, match="interrupted"):
+        prepare_input(path, profile, source_um=2.4, cache_dir=tmp_path / "cache")
+    monkeypatch.setattr(prepare_module, "write_zarr", real)
+    again = prepare_input(path, profile, source_um=2.4, cache_dir=tmp_path / "cache")
+    assert again.receipt["cache_hit"] is False
+    assert int(np.asarray(again.array).min()) == 9

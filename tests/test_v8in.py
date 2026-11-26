@@ -87,3 +87,26 @@ def test_mps_out_of_memory_halves_the_batch_and_keeps_it(tmp_path, monkeypatch):
 def test_out_of_memory_off_mps_is_an_error(tmp_path, monkeypatch):
     with pytest.raises(InkSDKError, match="out of memory"):
         _commands(tmp_path, monkeypatch, "cuda", fits=2)
+
+
+def test_v8in_reports_the_scan_coverage_as_valid(tmp_path, monkeypatch):
+    code = tmp_path / "ink-8um-v8in"
+    (code / "ink8um").mkdir(parents=True)
+    (code / "predict.py").write_text("")
+    checkpoint = code / "model.safetensors"
+    checkpoint.write_bytes(b"fake")
+    monkeypatch.setattr(ModelProfile, "verify_checkpoint", lambda self, models: checkpoint)
+
+    def fake_run(command, **kwargs):
+        np.save(command[command.index("--output") + 1], np.full((8, 8), 0.5, dtype=np.float32))
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    scanned = np.zeros((8, 8), dtype=bool)
+    scanned[:3] = True
+    prepared = PreparedInput(path=tmp_path / "p.zarr", array=np.full((28, 8, 8), 100, dtype=np.uint8),
+                             pixel_um=(9.362,) * 3, source=tmp_path / "p.zarr",
+                             scale_plan=ScalePlan(9.362, 9.362, "native"), valid=scanned)
+    ctx = RunContext(workdir=tmp_path / "work", models_dir=tmp_path, device="cpu", python="py")
+    raw = v8in.V8inAdapter().run(prepared, get_profile("v8in@ink-8um-v8in"), ctx)
+    assert np.array_equal(raw.valid, scanned)

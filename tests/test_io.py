@@ -54,3 +54,24 @@ def test_ct_preflight_requires_level_zero_uint8(tmp_path):
     meta_path.write_text(json.dumps(meta))
     with pytest.raises(ValidationError):
         ct_preflight(path)
+
+
+class _CutOff:
+    """An array whose data never arrives, as when a write is interrupted."""
+
+    shape, dtype, ndim = (4, 8, 8), np.dtype("u1"), 3
+
+    def __getitem__(self, key):
+        raise RuntimeError("interrupted")
+
+    def __array__(self, *args, **kwargs):
+        raise RuntimeError("interrupted")
+
+
+def test_an_interrupted_write_leaves_no_store_that_looks_complete(tmp_path):
+    path = tmp_path / "vol.zarr"
+    with pytest.raises(RuntimeError, match="interrupted"):
+        write_zarr(path, _CutOff())
+    assert not (path / "0" / ".zarray").exists()
+    write_zarr(path, np.full((4, 8, 8), 7, dtype=np.uint8))
+    assert int(np.asarray(open_volume_array(path)).min()) == 7

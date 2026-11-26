@@ -259,3 +259,36 @@ def test_doctor_checks_villa_imports_with_the_model_interpreter(tmp_path, monkey
     seen.clear()
     runner.doctor(villa=root, models_dir=tmp_path, python="/flag/python")
     assert any(command[0] == "/flag/python" for command in seen)
+
+
+def test_liveness_leaves_out_pixels_with_no_scan_under_them(tmp_path, monkeypatch):
+    from ink_sdk.liveness import assess_liveness
+
+    profile = get_profile("ink_9um@reader-v3")
+    checkpoint = tmp_path / "step.pth"
+    checkpoint.write_bytes(b"fake")
+    monkeypatch.setattr(ModelProfile, "verify_checkpoint", lambda self, models: checkpoint)
+    scanned = np.zeros((32, 32), dtype=bool)
+    scanned[:, :10] = True  # most of the rendered surface has no scan, as at the ragged edge of a tifxyz render
+
+    def fake_run(command, **kwargs):
+        if command[0] == "git":
+            return subprocess.CompletedProcess(command, 0, "abc123\n", "")
+        flat = np.where(scanned, 128, 0).astype(np.uint8)  # a dead model: one value on papyrus, 0 off it
+        tifffile.imwrite(Path(command[5]), flat)
+        tifffile.imwrite(Path(command[5]).with_name("ink_reverse.tif"), flat)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    prepared = PreparedInput(
+        path=tmp_path / "prepared.zarr",
+        array=np.where(scanned, 100, 0).astype(np.uint8)[None].repeat(17, 0),
+        pixel_um=(9.362, 9.362, 9.362),
+        source=tmp_path / "prepared.zarr",
+        scale_plan=ScalePlan(9.362, 9.362, "native"),
+        valid=scanned,
+    )
+    ctx = RunContext(villa=_villa_main(tmp_path), workdir=tmp_path / "work", models_dir=tmp_path, device="cpu")
+    raw = Ink9umAdapter().run(prepared, profile, ctx)
+    assert np.array_equal(raw.valid, scanned)
+    assert assess_liveness(raw.maps["forward"], valid=raw.valid)["verdict"] != "ALIVE"
