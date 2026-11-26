@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -153,12 +155,12 @@ def write_zarr(
     path = Path(path)
     if path.exists() and not overwrite:
         raise ValidationError(f"refusing to overwrite {path}")
-    if path.exists():
-        import shutil
-
-        shutil.rmtree(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    group = zarr.open_group(str(path), mode="w", zarr_format=2)
+    # Write beside the target and move it in place at the end, so that an
+    # interrupted write never leaves a store that looks complete.
+    partial = path.with_name(f".{path.name}.partial-{os.getpid()}")
+    shutil.rmtree(partial, ignore_errors=True)
+    group = zarr.open_group(str(partial), mode="w", zarr_format=2)
     if chunks is None:
         chunks = tuple(min(128, size) for size in array.shape)
     group.create_array("0", shape=array.shape, dtype=array.dtype, chunks=chunks)
@@ -166,6 +168,9 @@ def write_zarr(
     for key, value in (attrs or {}).items():
         group.attrs[key] = value
     group["0"].attrs.update(attrs or {})
+    if path.exists():
+        shutil.rmtree(path)
+    os.replace(partial, path)
     return path
 
 

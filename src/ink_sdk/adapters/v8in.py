@@ -162,7 +162,7 @@ class V8inAdapter(BaseAdapter):
             maps["mean"] = (maps["forward"] + maps["reverse"]) / 2.0
         return RawOutput(
             maps=maps,
-            valid=np.ones_like(next(iter(maps.values())), dtype=bool),
+            valid=prepared.valid if prepared.valid is not None else np.ones_like(next(iter(maps.values())), dtype=bool),
             quantisation={"source_dtype": "float32", "levels": None, "scale": 1.0},
             receipt={
                 "adapter": "v8in",

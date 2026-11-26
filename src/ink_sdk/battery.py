@@ -23,6 +23,7 @@ from __future__ import annotations
 import base64
 import dataclasses
 import html
+import shutil
 import struct
 import time
 import zlib
@@ -144,7 +145,8 @@ def run_battery(
     if ctx.dry_run:
         return {"layers": n, "cells": [dataclasses.asdict(c) for c in cells], "skipped": skipped}
 
-    work = out_dir / "_windows"; work.mkdir(exist_ok=True)
+    # Windows left by an earlier battery in this folder may come from another surface volume.
+    work = out_dir / "_windows"; shutil.rmtree(work, ignore_errors=True); work.mkdir()
     results: list[dict] = []
     from .resolver import build_segment
 

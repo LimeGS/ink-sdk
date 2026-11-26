@@ -307,8 +307,9 @@ class Ink9umAdapter(BaseAdapter):
         return RawOutput(
             maps=maps,
             # The 9 um lane has a legitimate 0.25 no-ink floor; do not exclude
-            # zeros from liveness as if they were missing coverage.
-            valid=np.ones_like(next(iter(maps.values())), dtype=bool),
+            # zeros from liveness as if they were missing coverage. Pixels with
+            # no scan under them are, though: upstream writes 0 there.
+            valid=prepared.valid if prepared.valid is not None else np.ones_like(next(iter(maps.values())), dtype=bool),
             quantisation={
                 "source_dtype": "uint8",
                 "levels": 255,

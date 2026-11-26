@@ -1,8 +1,10 @@
+import json
 import zlib
+from pathlib import Path
 
 import numpy as np
 
-from ink_sdk.battery import plan_battery, png_bytes, window
+from ink_sdk.battery import plan_battery, png_bytes, run_battery, window
 from ink_sdk.registry import get_profile, list_profiles
 
 
@@ -70,6 +72,43 @@ def test_plan_pools_depth_at_source_scale():
     assert len(by["hecate@2.4um"].layers) == 64
     assert not any(p.startswith("ink_9um") for p in by)        # 17 x 4 = 68 > 65
     assert any("17 x pool 4" in s["reason"] for s in skipped)
+
+
+def test_a_second_battery_in_the_same_folder_reads_its_own_volume(tmp_path):
+    import zarr
+
+    from ink_sdk.adapters.base import BaseAdapter
+    from ink_sdk.contracts import RawOutput, RunContext
+    from ink_sdk.runner import infer
+
+    class LayerMean(BaseAdapter):
+        name = "ink9um"
+
+        def run(self, prepared, profile, ctx):
+            return RawOutput(maps={"forward": np.asarray(prepared.array, np.float32).mean(0) / 255.0},
+                             valid=prepared.valid)
+
+    class SDK:
+        def infer(self, seg, profile, out_dir, ctx):
+            return infer(seg, profile, ctx, out_dir=out_dir, adapter=LayerMean())
+
+    def volume(name, stripes):
+        yy, xx = np.mgrid[0:64, 0:64]
+        image = 128 + 100 * np.sin((xx if stripes == "vertical" else yy) / 4.0)
+        group = zarr.open_group(str(tmp_path / name), mode="w", zarr_format=2)
+        group.create_array("0", shape=(41, 64, 64), dtype="u1", chunks=(41, 32, 32))
+        group["0"][:] = np.repeat(image[None], 41, 0).clip(1, 255).astype(np.uint8)
+        return tmp_path / name
+
+    ctx = RunContext(cache_dir=tmp_path / "cache", models_dir=tmp_path / "models", overwrite=True, on_degenerate="warn")
+    out = tmp_path / "battery"
+    for source in (volume("a.zarr", "vertical"), volume("b.zarr", "horizontal")):
+        run_battery(SDK(), source, 9.362, [get_profile("ink_9um@reader-v3")], out, ctx, centres=(0,), steps=(1,),
+                    say=lambda message: None)
+    cell = json.loads((out / "BATTERY.json").read_text())["cells"][0]
+    got = np.load(Path(cell["dir"]) / "probability.npy")
+    expected = np.asarray(zarr.open_group(str(tmp_path / "b.zarr"), mode="r")["0"], np.float32)[12:29].mean(0) / 255
+    assert np.corrcoef(got.ravel(), expected.ravel())[0, 1] > 0.99
 
 
 def test_battery_page_renders_summary_failures_and_escapes(tmp_path):
