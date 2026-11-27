@@ -470,6 +470,12 @@ ink-sdk infer \
 to the ROI: the receipt records `render_crop = null` and
 `render_crop_application = "not-implemented-post-render-roi"`.
 
+`RENDER_RECEIPT.json` records VC3D's reported `canvas_rect` as
+`{"x": 19, "y": 7, "width": 4721, "height": 4181}`, for example. The origin is the
+top-left pixel on the full renderer canvas, before SDK transposition, flips, scaling, or ROI.
+The same rectangle is in the Zarr group's `ink_sdk_render` attributes. A null or missing
+field means the coordinates are unknown, including for older cached renders.
+
 </details>
 
 <details>
