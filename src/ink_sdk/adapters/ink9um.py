@@ -122,6 +122,8 @@ def _loader_args(
     tiles load in threads, or in the main process where upstream has no --loader-threads.
     """
     platform = platform or sys.platform
+    if platform != "darwin" and not platform.startswith("linux"):
+        return []
     source = python_path / (module.replace(".", "/") + ".py")
     try:
         text = source.read_text(encoding="utf-8")
@@ -131,7 +133,7 @@ def _loader_args(
     if platform == "darwin":
         return ["--num-workers", "0", "--loader-threads", str(LOADER_THREADS)] if has_threads else []
     shared = _shared_memory_bytes() if shared_memory is None else shared_memory
-    if platform.startswith("linux") and shared < MIN_SHARED_MEMORY and '"--num-workers"' in text:
+    if shared < MIN_SHARED_MEMORY and '"--num-workers"' in text:
         threads = ["--loader-threads", str(LOADER_THREADS)] if has_threads else []
         return ["--num-workers", "0", *threads]
     return []

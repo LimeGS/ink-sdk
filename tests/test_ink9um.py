@@ -179,6 +179,11 @@ def test_loader_args_use_threads_on_macos_when_upstream_has_them(tmp_path):
     assert _loader_args(main, MAIN_MODULE, "darwin") == []
 
 
+def test_windows_loader_without_statvfs(tmp_path, monkeypatch):
+    monkeypatch.delattr("os.statvfs", raising=False)
+    assert _loader_args(tmp_path, MAIN_MODULE, "win32") == []
+
+
 def test_loader_args_avoid_worker_processes_when_shared_memory_is_small(tmp_path):
     # Docker gives containers 64 MiB of /dev/shm; DataLoader workers cannot hand tiles over in that.
     main = _villa_main(tmp_path / "main") / "vesuvius" / "src"
