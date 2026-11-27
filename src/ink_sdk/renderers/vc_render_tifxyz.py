@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -221,6 +222,15 @@ def _derive_num_slices(segment: Segment, profile: ModelProfile) -> int:
     if scale and profile.input.scale_um > 5 and abs(scale - 2.4) <= 0.15:
         return profile.input.depth * 4
     return profile.input.depth
+
+
+def _canvas_rect(stdout: str) -> dict[str, int] | None:
+    """Rectangle reported by VC3D, in full-canvas pixels before SDK orientation."""
+    match = re.search(r"(?:auto-crop:| crop) \[(\d+)[×x](\d+) from \((\d+),\s*(\d+)\)\]", stdout)
+    if match is None:
+        return None
+    width, height, x, y = map(int, match.groups())
+    return {"x": x, "y": y, "width": width, "height": height}
 
 
 def _read_render(stage: Path) -> np.ndarray:
@@ -441,7 +451,7 @@ class VcRenderTifxyzRenderer:
             env["OMP_NUM_THREADS"] = str(int(ctx.render_threads))
             ctx.say(f"render: {' '.join(actual)}")
             completed = subprocess.run(
-                actual, capture_output=True, text=True, timeout=4 * 3600, env=env
+                actual, capture_output=True, encoding="utf-8", errors="replace", timeout=4 * 3600, env=env
             )
             if completed.returncode != 0:
                 raise RenderError(
@@ -481,6 +491,7 @@ class VcRenderTifxyzRenderer:
                 "slice_step": int(spec.slice_step),
                 "orientation": orientation,
                 "auto_crop": bool(supports_auto_crop),
+                "canvas_rect": _canvas_rect(completed.stdout),
                 "slice_step_passed": bool(supports_slice_step),
                 "flip_normals_python": python_flip,
                 "roi": list(spec.roi) if spec.roi else None,

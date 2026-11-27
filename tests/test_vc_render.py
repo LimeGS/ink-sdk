@@ -9,7 +9,7 @@ import pytest
 from ink_sdk.contracts import RenderSpec, RunContext, Segment
 from ink_sdk.errors import RenderError
 from ink_sdk.registry import get_profile
-from ink_sdk.renderers.vc_render_tifxyz import VcRenderTifxyzRenderer
+from ink_sdk.renderers.vc_render_tifxyz import VcRenderTifxyzRenderer, _canvas_rect
 from ink_sdk.resolver import build_segment, with_render_spec
 
 FAKE = r'''#!/usr/bin/env python3
@@ -29,6 +29,8 @@ p.add_argument("--flip-normals", action="store_true")
 a = p.parse_args()
 x = tifffile.imread(os.path.join(a.s, "x.tif"))
 h, w = x.shape
+if a.auto_crop:
+    sys.stdout.buffer.write(f"auto-crop: [{w}\u00d7{h} from (19,7)]\n".encode("utf-8"))
 arr = np.empty((a.n, h, w), dtype=np.uint8)
 for z in range(a.n):
     arr[z] = (z + np.arange(h)[:, None] + np.arange(w)[None, :]) % 256
@@ -69,7 +71,12 @@ def test_render_command_and_cache(tmp_path, mesh, ct, monkeypatch):
     rendered = renderer.render(current, current.render, profile, ctx)
     assert rendered.shape_zyx == (68, 8, 8)
     assert rendered.cache_hit is False
-    assert (rendered.path / "RENDER_RECEIPT.json").is_file()
+    rect = {"x": 19, "y": 7, "width": 8, "height": 8}
+    receipt_path = rendered.path / "RENDER_RECEIPT.json"
+    receipt = json.loads(receipt_path.read_text())
+    assert receipt["canvas_rect"] == rect
+    attrs = json.loads((rendered.path / ".zattrs").read_text())
+    assert attrs["ink_sdk_render"]["canvas_rect"] == rect
     assert (rendered.path / "0" / ".zarray").is_file()
     argv = json.loads(log.read_text().splitlines()[0])
     assert "--scale" in argv and argv[argv.index("--scale") + 1] == "1.0"
@@ -79,7 +86,22 @@ def test_render_command_and_cache(tmp_path, mesh, ct, monkeypatch):
     again = renderer.render(current, current.render, profile, ctx)
     assert again.cache_hit is True
     assert again.shape_zyx == (68, 8, 8)
+    assert again.receipt["canvas_rect"] == rect
+    # Historical receipts predate canvas_rect. A cache hit cannot recover the origin.
+    del receipt["canvas_rect"]
+    receipt_path.write_text(json.dumps(receipt))
+    legacy = renderer.render(current, current.render, profile, ctx)
+    assert legacy.cache_hit and legacy.receipt.get("canvas_rect") is None
     assert len(log.read_text().splitlines()) == 1
+
+
+@pytest.mark.parametrize(("stdout", "expected"), [
+    ("auto-crop: [4721×4181 from (19,27)]", {"x": 19, "y": 27, "width": 4721, "height": 4181}),
+    ("rendering 80x60 at scale 1 crop [80×60 from (0,0)]", {"x": 0, "y": 0, "width": 80, "height": 60}),
+    ("render complete", None),
+])
+def test_reported_canvas_rect(stdout, expected):
+    assert _canvas_rect(stdout) == expected
 
 
 def test_explicit_scale_wins_over_ct_metadata(tmp_path, mesh, ct):
