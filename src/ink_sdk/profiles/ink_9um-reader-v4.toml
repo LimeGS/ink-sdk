@@ -1,0 +1,48 @@
+schema = "ink-sdk.profile.v1"
+id = "ink_9um@reader-v4"
+adapter = "ink9um"
+family = "surface-volume-2d"
+
+[source]
+repo = "domenicor046/reader-v4"
+revision = "56c942feb458384fc0c7848934f67f3c6d393aaf"
+upstream = "ScrollPrize/villa"
+# Same koine_machines architecture and inference code as Reader V3; training code and figures:
+# https://github.com/DomRusso2/reader-v4 (ca389f910ca9f5ffea19a37bc12770c9499562b3)
+upstream_revision = "3ea17f54a9b3d5fd1aaf73e1d2c8386dbaa9f30e"
+url = "https://huggingface.co/domenicor046/reader-v4"
+license = "MIT"
+
+[checkpoint]
+path = "reader-v4/reader-v4.pth"
+upstream_path = "reader-v4.pth"
+sha256 = "d3bf96b910916d0a9653aaaf11d6033cbc17b3db32c0130a56084917fab8fecb"
+bytes = 138383307
+
+[input]
+kind = "surface-volume"
+family = "surface-volume-2d"
+# Drop-in replacement for Reader V3 (author's README): same rendered surface volume and the same
+# koine_machines command, so the same native range as V3 (8.64 um inside the tolerance).
+scale_um = 9.362
+scale_tolerance_um = 0.75
+depth = 17
+# Checkpoint config: crop_size / patch_size [17, 384, 384], image_normalization robust_mad (1-99 %).
+normalization = "from-checkpoint"
+tile = 384
+overlap = 0.5
+
+[execution]
+direction = "both"
+blend = "hann"
+batch = 1
+amp = "bf16"
+
+[output]
+primary = "forward"
+# Not declared by the author. Read from the checkpoint config: the PU term (BrierNNPULoss) has
+# y_lo = 0.25 and the auxiliary BCE term uses label smoothing 0.5, so both push background and
+# unlabeled pixels toward 0.25. The author's README suggests stretching from the 60th-75th
+# percentile for viewing.
+no_ink_floor = 0.25
+floor_provenance = "checkpoint-config"

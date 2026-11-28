@@ -27,7 +27,7 @@ def test_plan_without_resample_runs_only_native_8_64_profiles():
     # Reader V3, dense_native and Rectina m4 are pinned at 9.362 +- 0.75 um, so 8.64 um is native to them;
     # the v8in profiles are pinned at 8.64 +- 0.75 um, Studio and Argus V2/V3 at 9.362 +- 0.75 um; every other profile needs a resample or is skipped
     # (TRACE v3B is pinned at 9.362 +- 0.1 um, as its authors advise).
-    native = {"ink_9um@reader-v3", "ink_9um@dense-native-step016000", "ink_9um@rectina-m4", "v8in@ink-8um-v8in",
+    native = {"ink_9um@reader-v3", "ink_9um@reader-v4", "ink_9um@dense-native-step016000", "ink_9um@rectina-m4", "v8in@ink-8um-v8in",
               "v8in@pherc0306b-ahn-s0", "v8in@pherc0306b-ahn-s1", "v8in@pherc0306b-ahn-s2",
               "studio@softloss-20261023", "ink_9um@argus-v2", "ink_9um@argus-v3",
               "ink_9um@jeff-0846a-sub8", "studio@jeff-0846a-sub8", "v8in@jeff-0846a-sub8"}
@@ -52,6 +52,14 @@ def test_reader_v3_profile_matches_its_checkpoint_config():
     p = get_profile("ink_9um@reader-v3")
     assert p.adapter == "ink9um" and p.input.depth == 17 and p.input.tile == 384
     assert p.checkpoint.sha256.startswith("ea405417") and p.checkpoint.bytes == 138379659
+
+
+def test_reader_v4_profile_matches_its_checkpoint_config():
+    from ink_sdk.registry import get_profile
+    p = get_profile("ink_9um@reader-v4")
+    assert p.adapter == "ink9um" and p.input.depth == 17 and p.input.tile == 384
+    assert p.checkpoint.sha256.startswith("d3bf96b9") and p.checkpoint.bytes == 138383307
+    assert p.output.no_ink_floor == 0.25 and p.output.floor_provenance == "checkpoint-config"
 
 
 def test_png_is_valid():

@@ -15,6 +15,7 @@ def test_builtin_profiles_are_exact():
         "ink_9um@dense-native-step016000",
         "ink_9um@reader-v2-step040000",
         "ink_9um@reader-v3",
+        "ink_9um@reader-v4",
         "canonical_2um@r152-3ddec-v2-l5-epoch13",
         "hecate@2.4um",
         "hecate@9.6um",
