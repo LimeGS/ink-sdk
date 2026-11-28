@@ -64,6 +64,8 @@ def _ctx(
     no_render_cache: bool,
     orient_report: Optional[dict] = None,
     batch: Optional[int] = None,
+    scroll: Optional[str] = None,
+    segment: Optional[str] = None,
 ) -> RunContext:
     return RunContext(
         device=device,
@@ -88,6 +90,8 @@ def _ctx(
         primary=primary,
         orient_report=orient_report,
         render_cache=Path(tempfile.mkdtemp(prefix="ink-sdk-no-render-cache-")) if no_render_cache else None,
+        scroll=scroll,
+        segment=segment,
     )
 
 
@@ -251,6 +255,8 @@ def inspect(
     renderer: Optional[Path] = typer.Option(None, "--renderer"),
     villa: Optional[Path] = typer.Option(None, "--villa"),
     models_dir: Optional[Path] = typer.Option(None, "--models-dir"),
+    scroll: Optional[str] = typer.Option(None, "--scroll", help="Scroll name for the training-overlap flag (e.g. PHerc0139)."),
+    segment: Optional[str] = typer.Option(None, "--segment", help="Segment id, folder or w-number for the training-overlap flag."),
     json_output: bool = typer.Option(False, "--json"),
 ) -> None:
     """Show the scale/render/inference plan without loading weights."""
@@ -260,7 +266,7 @@ def inspect(
         python=None, overwrite=False, dry_run=True, deterministic=False, render_threads=1,
         max_render_gb=64.0, on_degenerate="warn", resample_from_um=None, output_3d=False,
         amp=None, roi=parsed_roi, normal=normal, umbilicus=umbilicus, primary=None,
-        no_render_cache=False,
+        no_render_cache=False, scroll=scroll, segment=segment,
     )
     sdk = _build_sdk(renderer, models_dir, None, "auto", villa)
     segment = _build_segment(
@@ -395,6 +401,8 @@ def infer(
     deterministic: bool = typer.Option(False, "--deterministic"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     json_output: bool = typer.Option(False, "--json"),
+    scroll: Optional[str] = typer.Option(None, "--scroll", help="Scroll name for the training-overlap flag (e.g. PHerc0139)."),
+    segment: Optional[str] = typer.Option(None, "--segment", help="Segment id, folder or w-number for the training-overlap flag."),
 ) -> None:
     """Run one profile on a segment and publish maps plus receipts."""
     parsed_roi = _roi(roi)
@@ -408,6 +416,7 @@ def infer(
         no_render_cache=no_render_cache,
         orient_report=json.loads(orient_report.read_text(encoding="utf-8")) if orient_report else None,
         batch=batch,
+        scroll=scroll, segment=segment,
     )
     sdk = _build_sdk(renderer, models_dir, cache_dir, device, villa)
     segment = _build_segment(
@@ -499,6 +508,8 @@ def battery_cmd(
     ensemble: Optional[str] = typer.Option(
         None, "--ensemble",
         help="Also write a z-score ensemble of the cells; the value is the reading side (forward or reverse)."),
+    scroll: Optional[str] = typer.Option(None, "--scroll", help="Scroll name for the training-overlap flag (e.g. PHerc0139)."),
+    segment: Optional[str] = typer.Option(None, "--segment", help="Segment id, folder or w-number for the training-overlap flag."),
 ) -> None:
     """Every profile x depth centre x depth width on one segment: maps, overlays, a mosaic, a stability map."""
     from .battery import run_battery
@@ -509,6 +520,7 @@ def battery_cmd(
         overwrite=True, dry_run=dry_run, deterministic=False, render_threads=1, max_render_gb=64.0,
         on_degenerate="warn", resample_from_um=resample_from_um, output_3d=False, amp=None, roi=None,
         normal="auto", umbilicus=None, primary=None, no_render_cache=False, batch=batch,
+        scroll=scroll, segment=segment,
     )
     sdk = _build_sdk(None, models_dir, cache_dir, device, villa)
     selected = [get_profile(item) for item in profile] if profile else list_profiles()

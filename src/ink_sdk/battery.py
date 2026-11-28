@@ -36,6 +36,7 @@ from .errors import InkSDKError
 from .io import open_volume_array, write_json, write_zarr
 from .prepare import plan_scale
 from .profiles import ModelProfile
+from .training_overlap import lookup_ids, resolve_input, short_flag
 
 
 # ---------- tiny PNG writer (no Pillow dependency) ----------
@@ -141,8 +142,13 @@ def run_battery(
     started = time.time()
     if ensemble is not None and ensemble not in ("forward", "reverse"):
         raise InkSDKError(f"--ensemble must be forward or reverse (the reading side), not {ensemble!r}")
+    # Training overlap: resolve scroll/segment once, from the ORIGINAL input, before any
+    # temporary window is written, so every cell reports what a single infer would.
+    overlap_input = resolve_input(surface_volume, scroll=ctx.scroll, segment=ctx.segment)
+    overlap = {p.id: lookup_ids(p.id, overlap_input) for p in profiles}
     if ctx.dry_run:
-        return {"layers": n, "cells": [dataclasses.asdict(c) for c in cells], "skipped": skipped}
+        return {"layers": n, "cells": [dataclasses.asdict(c) for c in cells], "skipped": skipped,
+                "training_overlap": overlap}
 
     work = out_dir / "_windows"; work.mkdir(exist_ok=True)
     results: list[dict] = []
@@ -156,11 +162,13 @@ def run_battery(
             write_zarr(win, np.ascontiguousarray(thick[list(cell.layers)]),
                        attrs={"pixel_um": [pixel_um] * 3, "battery_layers": list(cell.layers)}, overwrite=True)
         cdir = out_dir / "cells" / p.id.replace("@", "_") / tag
-        row = {"profile": p.id, "centre": cell.centre, "step": cell.step, "layers": list(cell.layers), "dir": str(cdir)}
+        row = {"profile": p.id, "centre": cell.centre, "step": cell.step, "layers": list(cell.layers),
+               "dir": str(cdir), "training_overlap": overlap[p.id]}
         say(f"[{i}/{len(cells)}] {p.id} {tag}")
         try:
             cctx = dataclasses.replace(ctx, on_degenerate="warn", overwrite=True,
-                                       resample_from_um=resample_from_um if p.adapter == "ink9um" else None)
+                                       resample_from_um=resample_from_um if p.adapter == "ink9um" else None,
+                                       overlap_input=overlap_input)
             seg = build_segment(profile=p, ctx=cctx, surface_volume=win, voxel_um=pixel_um)
             res = sdk.infer(seg, p, out_dir=cdir, ctx=cctx)
             rec = res.receipt
@@ -179,9 +187,11 @@ def run_battery(
     report = {"schema": "ink-sdk.battery.v1", "surface_volume": str(surface_volume), "pixel_um": pixel_um,
               "layers": n, "centres": list(centres), "steps": list(steps), "thresholds": list(thresholds),
               "resample_from_um": resample_from_um, "cells": results, "skipped": skipped,
+              "training_overlap_input": overlap_input,
               "runtime_seconds": round(time.time() - started, 1),
               "non_claims": ["A probability map is not OCR and does not accept ink, text or letters.",
-                             "The battery shows every cell; it does not select a best one."]}
+                             "The battery shows every cell; it does not select a best one.",
+                             "Training-overlap is a metadata flag, not a score or a verdict."]}
     report["images"] = make_images(thick, results, out_dir, thresholds, thumb_px)
     if ensemble:
         from .ensemble import ensemble_battery
@@ -403,7 +413,8 @@ def to_html(report: dict, out_dir: Path) -> str:
     for r in cells:
         detail = "" if r.get("ok") else f'<div class="err">{_esc(str(r.get("error", ""))[-300:])}</div>'
         trs.append(f'<tr><td class="p">{_esc(r["profile"])}</td><td class="num">{r["centre"]:+d}</td>'
-                   f'<td class="num">{r["step"]}</td><td>{_badge(r)}{detail}</td>{_p99_cell(r)}</tr>')
+                   f'<td class="num">{r["step"]}</td><td>{_badge(r)}{detail}</td>{_p99_cell(r)}'
+                   f'<td>{_esc(short_flag(r.get("training_overlap")))}</td></tr>')
     skipped = "".join(f"<li><b>{_esc(s['profile'])}</b>{_esc(_where(s))}: {_esc(s['reason'])}</li>"
                       for s in report["skipped"])
     nav = [("ensemble", "Ensemble", report.get("ensemble")), ("stability", "Across settings", stab),
@@ -421,7 +432,7 @@ def to_html(report: dict, out_dir: Path) -> str:
 <nav>{nav_html}</nav><main>
 {_ensemble_html(report.get("ensemble"))}{stab_html}{_mosaics_html(ims, out_dir)}
 <section id="cells"><h2>Cells</h2><div class="tw"><table><tr><th>profile</th><th>centre</th><th>step</th>
-<th>liveness</th><th>p99 of primary map</th></tr>{"".join(trs)}</table></div></section>
+<th>liveness</th><th>p99 of primary map</th><th>training overlap</th></tr>{"".join(trs)}</table></div></section>
 <section id="skipped"><h2>Skipped</h2><ul class="skip">{skipped or "<li>none</li>"}</ul></section>
 </main><footer><ul style="margin:0;padding-left:18px">{claims}</ul></footer></body></html>"""
 
