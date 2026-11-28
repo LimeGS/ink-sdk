@@ -136,6 +136,8 @@ runs the same checks as `ink-sdk doctor`.
 
 `ink-sdk models` lists them; `ink-sdk models --json` also shows checkpoint paths and SHA-256 values.
 
+Reader V2, V3 and V4 are by Domenico Russo (KLAVIS), all MIT. Reader V4 ([DomRusso2/reader-v4](https://github.com/DomRusso2/reader-v4), weights at [domenicor046/reader-v4](https://huggingface.co/domenicor046/reader-v4)) is the first 9 µm reader trained from scratch with positive-unlabeled learning on 3-pixel centreline labels, using his [ScribblePU](https://github.com/DomRusso2/scribble-pu); it is a drop-in for Reader V3. Its no-ink floor (0.25) is read from the checkpoint's training config, not declared by the author.
+
 Seed 42 and dense_native are the two models Erwin Nieuwlaar added to the public set in his PHerc0343 First
 Letters recipe ([Nieuwlaar/pherc343-first-letters](https://github.com/Nieuwlaar/pherc343-first-letters)).
 dense_native ([Nieuwlaar/ink9um-dense-native](https://huggingface.co/Nieuwlaar/ink9um-dense-native), MIT) is
